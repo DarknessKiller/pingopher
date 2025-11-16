@@ -1,6 +1,10 @@
 package uptime_handler
 
 import (
+	"errors"
+	"io"
+	"net/http"
+
 	"github.com/DarknessKiller/pingopher/internal/dto"
 	uptime "github.com/DarknessKiller/pingopher/internal/service/uptime"
 	"github.com/gin-gonic/gin"
@@ -18,13 +22,13 @@ func New(service *uptime.Service, scheduler *uptime.Scheduler) *Handler {
 func (h *Handler) CreateHost(ctx *gin.Context) {
 	host, err := dto.BindAndMap[dto.CreateHostRequest](ctx)
 	if err != nil {
-		ctx.JSON(400, gin.H{"status": "error", "message": err.Error()})
+		handleError(ctx, err)
 		return
 	}
 
 	err = h.service.CreateHost(ctx, host)
 	if err != nil {
-		ctx.JSON(500, gin.H{"status": "error", "message": err.Error()})
+		handleError(ctx, err)
 		return
 	}
 	h.scheduler.ScheduleHost(ctx, host)
@@ -35,7 +39,7 @@ func (h *Handler) CreateHost(ctx *gin.Context) {
 func (h *Handler) GetAllHosts(ctx *gin.Context) {
 	hosts, err := h.service.GetAllHosts(ctx)
 	if err != nil {
-		ctx.JSON(500, gin.H{"status": "error", "message": err.Error()})
+		handleError(ctx, err)
 		return
 	}
 
@@ -47,13 +51,13 @@ func (h *Handler) UpdateHost(ctx *gin.Context) {
 
 	host, err := dto.BindAndMap[dto.UpdateHostRequest](ctx)
 	if err != nil {
-		ctx.JSON(400, gin.H{"status": "error", "message": err.Error()})
+		handleError(ctx, err)
 		return
 	}
 
 	host, err = h.service.UpdateHost(ctx, hostID, host)
 	if err != nil {
-		ctx.JSON(500, gin.H{"status": "error", "message": err.Error()})
+		handleError(ctx, err)
 		return
 	}
 	h.scheduler.ScheduleHost(ctx, host)
@@ -66,7 +70,7 @@ func (h *Handler) DeleteHost(ctx *gin.Context) {
 
 	err := h.service.DeleteHost(ctx, hostID)
 	if err != nil {
-		ctx.JSON(500, gin.H{"status": "error", "message": err.Error()})
+		handleError(ctx, err)
 		return
 	}
 	h.scheduler.DeleteHost(ctx, hostID)
@@ -79,10 +83,21 @@ func (h *Handler) PingHost(ctx *gin.Context) {
 
 	histories, _, err := h.service.PingHost(ctx, hostID)
 	if err != nil {
-		ctx.JSON(500, gin.H{"status": "error", "message": err.Error()})
+		handleError(ctx, err)
 		return
 	}
 
 	ctx.JSON(200, dto.ToHistories(histories))
+}
 
+func handleError(ctx *gin.Context, err error) {
+	returnError := func(status int, msg string) { ctx.JSON(status, gin.H{"status": "error", "message": msg}) }
+
+	switch {
+	case errors.As(err, &dto.ValidationError{}):
+		returnError(http.StatusBadRequest, err.Error())
+	case errors.Is(err, io.EOF):
+	default:
+		returnError(http.StatusInternalServerError, err.Error())
+	}
 }

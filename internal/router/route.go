@@ -1,6 +1,8 @@
 package router
 
 import (
+	"net/http"
+
 	"github.com/DarknessKiller/pingopher/internal/bootstrap"
 	"github.com/DarknessKiller/pingopher/internal/handler"
 	uptime_handler "github.com/DarknessKiller/pingopher/internal/handler/uptime"
@@ -10,12 +12,12 @@ import (
 func Router(bs *bootstrap.Bootstrap) *gin.Engine {
 
 	r := gin.Default()
+	r.NoRoute(func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
 	handler := handler.New(bs)
 	uptimeHandler := uptime_handler.New(bs.UptimeService, bs.UptimeScheduler)
-
-	r.NoRoute(func(c *gin.Context) {
-		c.Status(404)
-	})
 
 	v1 := r.Group("/api/v1")
 	{
