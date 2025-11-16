@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch Pingopher",
+            "type": "go",
+            "request": "launch",
+            "program": "${workspaceFolder}/cmd/app/main.go",
+            "cwd": "${workspaceFolder}",
+            "mode": "debug",
+            "env": {
+                "ENV": "development",
+                "GIN_MODE": "debug",
+                "PINGOPHER_HOST": "localhost",
+                "PINGOPHER_PORT": "8080",
+                "PINGOPHER_DB_PATH": "pingopher.db"
+            }
+        }
+    ]
+}
