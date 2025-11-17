@@ -6,6 +6,7 @@ require (
 	github.com/gin-gonic/gin v1.11.0
 	github.com/go-playground/validator/v10 v10.27.0
 	github.com/joho/godotenv v1.5.1
+	github.com/robfig/cron/v3 v3.0.0
 	github.com/segmentio/ksuid v1.0.4
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.1

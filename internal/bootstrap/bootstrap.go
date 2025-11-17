@@ -17,6 +17,7 @@ type Bootstrap struct {
 	HostRepository    *repository.BaseRepository[model.Host]
 	HistoryRepository repository.HistoryRepository
 	UptimeService     *uptime.Service
+	UptimeScheduler   *uptime.Scheduler
 }
 
 func New() *Bootstrap {
@@ -32,5 +33,6 @@ func New() *Bootstrap {
 	bs.HostRepository = repository.NewBaseRepository[model.Host](bs.Database)
 	bs.HistoryRepository = repository.NewHistoryRepository(bs.Database)
 	bs.UptimeService = uptime.NewService(bs.Config, bs.HostRepository, bs.HistoryRepository)
+	bs.UptimeScheduler = uptime.NewScheduler(bs.UptimeService)
 	return bs
 }

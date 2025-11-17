@@ -7,11 +7,12 @@ import (
 )
 
 type Handler struct {
-	service *uptime.Service
+	service   *uptime.Service
+	scheduler *uptime.Scheduler
 }
 
-func New(service *uptime.Service) *Handler {
-	return &Handler{service: service}
+func New(service *uptime.Service, scheduler *uptime.Scheduler) *Handler {
+	return &Handler{service: service, scheduler: scheduler}
 }
 
 func (h *Handler) CreateHost(ctx *gin.Context) {
@@ -26,6 +27,7 @@ func (h *Handler) CreateHost(ctx *gin.Context) {
 		ctx.JSON(500, gin.H{"status": "error", "message": err.Error()})
 		return
 	}
+	h.scheduler.ScheduleHost(ctx, host)
 
 	ctx.JSON(201, dto.ToHost(host))
 }
@@ -54,6 +56,7 @@ func (h *Handler) UpdateHost(ctx *gin.Context) {
 		ctx.JSON(500, gin.H{"status": "error", "message": err.Error()})
 		return
 	}
+	h.scheduler.ScheduleHost(ctx, host)
 
 	ctx.JSON(200, dto.ToHost(host))
 }
@@ -66,6 +69,7 @@ func (h *Handler) DeleteHost(ctx *gin.Context) {
 		ctx.JSON(500, gin.H{"status": "error", "message": err.Error()})
 		return
 	}
+	h.scheduler.DeleteHost(ctx, hostID)
 
 	ctx.Status(204)
 }

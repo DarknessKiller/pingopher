@@ -11,7 +11,7 @@ func Router(bs *bootstrap.Bootstrap) *gin.Engine {
 
 	r := gin.Default()
 	handler := handler.New(bs)
-	uptimeHandler := uptime_handler.New(bs.UptimeService)
+	uptimeHandler := uptime_handler.New(bs.UptimeService, bs.UptimeScheduler)
 
 	r.NoRoute(func(c *gin.Context) {
 		c.Status(404)
