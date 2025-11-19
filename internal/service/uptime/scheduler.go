@@ -18,7 +18,7 @@ type Scheduler struct {
 	mu       sync.Mutex
 	service  *Service
 
-	failCounts map[string]int
+	downCounts map[string]int
 }
 
 func NewScheduler(service *Service) *Scheduler {
@@ -26,7 +26,7 @@ func NewScheduler(service *Service) *Scheduler {
 		cron:       cron.New(),
 		hostJobs:   make(map[string]cron.EntryID),
 		service:    service,
-		failCounts: make(map[string]int),
+		downCounts: make(map[string]int),
 	}
 }
 
@@ -91,34 +91,27 @@ func (ps *Scheduler) scheduleHost(ctx context.Context, host *model.Host) {
 }
 
 func (ps *Scheduler) runPingForHost(ctx context.Context, hostID string) {
-	host, err := ps.service.GetHostByID(ctx, hostID)
-	if err != nil {
-		log.Printf("[%s] fetch error: %v", hostID, err)
-		return
-	}
-
+	prevStatus, host, histories, err := ps.service.PingHost(ctx, hostID)
 	log.Printf("[%s] pinging...", host.HostURL)
-	histories, newStatus, err := ps.service.PingHost(ctx, hostID)
 	if err != nil {
 		log.Printf("[%s] ping failed: %v", host.HostURL, err)
 		return
 	}
 
-	prevStatus := host.Status
-	if newStatus == "failed" {
-		ps.failCounts[hostID]++
+	if host.Status == model.HostStatusDown {
+		ps.downCounts[hostID]++
 	} else {
-		ps.failCounts[hostID] = 0
+		ps.downCounts[hostID] = 0
 	}
 
-	if prevStatus != newStatus {
-		log.Printf("[%s] status changed: %s → %s", host.HostURL, prevStatus, newStatus)
+	if prevStatus != host.Status {
+		log.Printf("[%s] status changed: %s → %s", host.HostURL, prevStatus, host.Status)
 		util.SendNotificationWebhook(host, histories)
 		return
 	}
 
-	if newStatus == "failed" && ps.failCounts[hostID] > 0 && ps.failCounts[hostID]%int(host.FailThreshold) == 0 {
-		log.Printf("[%s] still failed after %d checks — resending notification", host.HostURL, ps.failCounts[hostID])
+	if host.Status == model.HostStatusDown && ps.downCounts[hostID] > 0 && ps.downCounts[hostID]%int(host.FailThreshold) == 0 {
+		log.Printf("[%s] still failed after %d checks — resending notification", host.HostURL, ps.downCounts[hostID])
 		util.SendNotificationWebhook(host, histories)
 		return
 	}

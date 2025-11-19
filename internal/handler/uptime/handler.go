@@ -81,7 +81,7 @@ func (h *Handler) DeleteHost(ctx *gin.Context) {
 func (h *Handler) PingHost(ctx *gin.Context) {
 	hostID := ctx.Param("id")
 
-	histories, _, err := h.service.PingHost(ctx, hostID)
+	_, _, histories, err := h.service.PingHost(ctx, hostID)
 	if err != nil {
 		handleError(ctx, err)
 		return

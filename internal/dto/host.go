@@ -10,6 +10,7 @@ type CreateHostRequest struct {
 	Protocol      string       `json:"protocol" binding:"required"`
 	HostURL       string       `json:"hostUrl" binding:"required"`
 	Port          uint16       `json:"port" binding:"omitempty,numeric,gte=1,lte=65535"`
+	TLS           tlsRequest   `json:"tls" binding:"omitempty"`
 	DNS           []dnsRequest `json:"dns" binding:"omitempty,dive"`
 	PingInterval  uint16       `json:"pingInterval" binding:"required,numeric"`
 	FailThreshold uint16       `json:"failThreshold" binding:"required,numeric"`
@@ -20,6 +21,10 @@ type dnsRequest struct {
 	IP       string `json:"ip" binding:"required,ipv4|ipv6"`
 	Port     uint16 `json:"port" binding:"required,numeric,gte=1,lte=65535"`
 	Protocol string `json:"protocol" binding:"required,oneof=udp tcp"`
+}
+
+type tlsRequest struct {
+	NoVerify bool `json:"noVerify" binding:"omitempty"`
 }
 
 func (r CreateHostRequest) ToModel() *model.Host {
@@ -36,14 +41,23 @@ func (r CreateHostRequest) ToModel() *model.Host {
 		}
 	}
 
+	var tls model.TLS
+	if r.TLS.NoVerify {
+		tls = model.TLS{
+			NoVerify: r.TLS.NoVerify,
+		}
+	}
+
 	return &model.Host{
 		Name:          r.Name,
 		Protocol:      r.Protocol,
 		HostURL:       r.HostURL,
 		Port:          r.Port,
+		TLS:           tls,
 		DNS:           dns,
 		PingInterval:  r.PingInterval,
 		FailThreshold: r.FailThreshold,
+		Status:        model.HostStatusUnknown,
 	}
 }
 
@@ -53,6 +67,7 @@ type Host struct {
 	Protocol      string      `json:"protocol"`
 	HostURL       string      `json:"hostUrl"`
 	Port          uint16      `json:"port"`
+	TLS           model.TLS   `json:"tls"`
 	DNS           []model.DNS `json:"dns"`
 	PingInterval  uint16      `json:"pingInterval"`
 	FailThreshold uint16      `json:"failThreshold"`
@@ -66,10 +81,11 @@ func ToHost(host *model.Host) Host {
 		Protocol:      host.Protocol,
 		HostURL:       host.HostURL,
 		Port:          host.Port,
+		TLS:           host.TLS,
 		DNS:           host.DNS,
 		PingInterval:  host.PingInterval,
 		FailThreshold: host.FailThreshold,
-		Status:        host.Status,
+		Status:        string(host.Status),
 	}
 }
 
@@ -92,6 +108,7 @@ type UpdateHostRequest struct {
 	Protocol      string       `json:"protocol" binding:"omitempty,oneof=udp tcp"`
 	HostURL       string       `json:"hostUrl" binding:"omitempty"`
 	Port          uint16       `json:"port" binding:"omitempty,numeric,gte=1,lte=65535"`
+	TLS           tlsRequest   `json:"tls" binding:"omitempty"`
 	DNS           []dnsRequest `json:"dns" binding:"omitempty,dive"`
 	PingInterval  uint16       `json:"pingInterval" binding:"omitempty,numeric"`
 	FailThreshold uint16       `json:"failThreshold" binding:"omitempty,numeric"`
@@ -111,11 +128,19 @@ func (r UpdateHostRequest) ToModel() *model.Host {
 		}
 	}
 
+	var tls model.TLS
+	if r.TLS.NoVerify {
+		tls = model.TLS{
+			NoVerify: r.TLS.NoVerify,
+		}
+	}
+
 	return &model.Host{
 		Name:          r.Name,
 		Protocol:      r.Protocol,
 		HostURL:       r.HostURL,
 		Port:          r.Port,
+		TLS:           tls,
 		DNS:           dns,
 		PingInterval:  r.PingInterval,
 		FailThreshold: r.FailThreshold,
