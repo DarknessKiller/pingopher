@@ -111,11 +111,6 @@ func (s *Service) PingHost(ctx context.Context, hostID string) (prevStatus model
 		return "", nil, nil, err
 	}
 
-	host, err = s.repository.Host().GetByID(ctx, host.ID.String())
-	if err != nil {
-		return "", nil, nil, err
-	}
-
 	return prevStatus, host, histories, nil
 }
 

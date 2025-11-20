@@ -50,12 +50,5 @@ func (h *historyRepository) CreatePingHistory(
 		return nil, err
 	}
 
-	for i, history := range histories {
-		histories[i], err = h.GetHistoryByID(ctx, history.ID.String())
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	return histories, err
 }
