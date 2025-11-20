@@ -8,7 +8,7 @@ import (
 )
 
 type Models interface {
-	Host | History | User
+	Host | History | Notification
 }
 
 type BaseModel struct {

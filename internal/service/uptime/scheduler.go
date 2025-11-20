@@ -7,26 +7,28 @@ import (
 	"sync"
 
 	"github.com/DarknessKiller/pingopher/internal/model"
-	"github.com/DarknessKiller/pingopher/internal/util"
+	"github.com/DarknessKiller/pingopher/internal/service/notification"
 	"github.com/gin-gonic/gin"
 	"github.com/robfig/cron/v3"
 )
 
 type Scheduler struct {
-	cron     *cron.Cron
-	hostJobs map[string]cron.EntryID
-	mu       sync.Mutex
-	service  *Service
+	cron                *cron.Cron
+	hostJobs            map[string]cron.EntryID
+	mu                  sync.Mutex
+	service             *Service
+	notificationService *notification.NotificationService
 
 	downCounts map[string]int
 }
 
-func NewScheduler(service *Service) *Scheduler {
+func NewScheduler(service *Service, notificationService *notification.NotificationService) *Scheduler {
 	return &Scheduler{
-		cron:       cron.New(),
-		hostJobs:   make(map[string]cron.EntryID),
-		service:    service,
-		downCounts: make(map[string]int),
+		cron:                cron.New(),
+		hostJobs:            make(map[string]cron.EntryID),
+		service:             service,
+		notificationService: notificationService,
+		downCounts:          make(map[string]int),
 	}
 }
 
@@ -106,13 +108,13 @@ func (ps *Scheduler) runPingForHost(ctx context.Context, hostID string) {
 
 	if prevStatus != host.Status {
 		log.Printf("[%s] status changed: %s → %s", host.HostURL, prevStatus, host.Status)
-		util.SendNotificationWebhook(host, histories)
+		ps.notificationService.SendNotification(host, histories)
 		return
 	}
 
 	if host.Status == model.HostStatusDown && ps.downCounts[hostID] > 0 && ps.downCounts[hostID]%int(host.FailThreshold) == 0 {
 		log.Printf("[%s] still failed after %d checks — resending notification", host.HostURL, ps.downCounts[hostID])
-		util.SendNotificationWebhook(host, histories)
+		ps.notificationService.SendNotification(host, histories)
 		return
 	}
 }

@@ -24,7 +24,7 @@ type dnsRequest struct {
 }
 
 type tlsRequest struct {
-	NoVerify bool `json:"noVerify" binding:"omitempty"`
+	NoVerify bool `json:"no_verify" binding:"omitempty"`
 }
 
 func (r CreateHostRequest) ToModel() *model.Host {

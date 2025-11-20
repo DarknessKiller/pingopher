@@ -5,6 +5,7 @@ import (
 
 	"github.com/DarknessKiller/pingopher/internal/bootstrap"
 	"github.com/DarknessKiller/pingopher/internal/handler"
+	notification_handler "github.com/DarknessKiller/pingopher/internal/handler/notification"
 	uptime_handler "github.com/DarknessKiller/pingopher/internal/handler/uptime"
 	"github.com/gin-gonic/gin"
 )
@@ -18,6 +19,7 @@ func Router(bs *bootstrap.Bootstrap) *gin.Engine {
 
 	handler := handler.New(bs)
 	uptimeHandler := uptime_handler.New(bs.UptimeService, bs.UptimeScheduler)
+	notificationHandler := notification_handler.New(bs.NotificationService)
 
 	v1 := r.Group("/api/v1")
 	{
@@ -33,6 +35,14 @@ func Router(bs *bootstrap.Bootstrap) *gin.Engine {
 				hostGroup.PUT("", uptimeHandler.UpdateHost)
 				hostGroup.DELETE("", uptimeHandler.DeleteHost)
 				hostGroup.GET("", uptimeHandler.PingHost)
+
+				notification := hostGroup.Group("/notification")
+				{
+					notification.POST("", notificationHandler.CreateNotification)
+					notification.GET("", notificationHandler.GetAllNotificationsForHost)
+					notification.DELETE("/:id", notificationHandler.DeleteNotification)
+					notification.PUT(":id", notificationHandler.UpdateNotification)
+				}
 			}
 		}
 	}

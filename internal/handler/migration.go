@@ -8,6 +8,7 @@ import (
 var migrations = []interface{}{
 	&model.Host{},
 	&model.History{},
+	&model.Notification{},
 }
 
 func (h *Handler) Migration(ctx *gin.Context) {
