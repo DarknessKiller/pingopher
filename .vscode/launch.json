@@ -13,6 +13,7 @@
                 "GIN_MODE": "debug",
                 "PINGOPHER_HOST": "localhost",
                 "PINGOPHER_PORT": "8080",
+                "PINGOPHER_DB_TYPE": "sqlite",
                 "PINGOPHER_DB_PATH": "pingopher.db"
             }
         }

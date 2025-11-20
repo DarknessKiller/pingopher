@@ -1,20 +1,51 @@
 package bootstrap
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/DarknessKiller/pingopher/internal/config"
+	"github.com/kofj/gorm-driver-d1/gormd1"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func InitiateDatabase(cfg *config.Config) *gorm.DB {
+	switch cfg.DatabaseType {
+	case "sqlite":
+		return InitiateSQLiteDatabase(cfg)
+	case "d1":
+		return InitiateD1Database(cfg)
+	default:
+		log.Fatal("Unsupported database type:", cfg.DatabaseType)
+		return nil
+	}
+}
+
+// SQLite
+func InitiateSQLiteDatabase(cfg *config.Config) *gorm.DB {
 
 	db, err := gorm.Open(sqlite.Open(cfg.SQLitePath), &gorm.Config{})
 	if err != nil {
 		log.Fatal("Failed to connect to SQLite:", err)
 	}
 
-	log.Println("SQLite connected! File →", cfg.SQLitePath)
+	log.Println("SQLite connected! File: ", cfg.SQLitePath)
 	return db
+}
+
+// Cloudflare D1
+func InitiateD1Database(cfg *config.Config) *gorm.DB {
+	dsn := fmt.Sprintf("d1://%s:%s@%s",
+		cfg.CloudflareD1.AccountID,
+		cfg.CloudflareD1.AuthToken,
+		cfg.CloudflareD1.DatabaseString)
+
+	gormDB, err := gorm.Open(gormd1.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatal("Failed to initialize GORM with D1:", err)
+	}
+
+	log.Println("D1 connected! Database: ", cfg.CloudflareD1.DatabaseString)
+	return gormDB
 }
