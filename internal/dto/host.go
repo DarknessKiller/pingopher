@@ -7,7 +7,7 @@ import (
 
 type CreateHostRequest struct {
 	Name          string       `json:"name" binding:"required"`
-	Protocol      string       `json:"protocol" binding:"required"`
+	Protocol      string       `json:"protocol" binding:"required,oneof=http https"`
 	HostURL       string       `json:"hostUrl" binding:"required"`
 	Port          uint16       `json:"port" binding:"omitempty,numeric,gte=1,lte=65535"`
 	TLS           tlsRequest   `json:"tls" binding:"omitempty"`
@@ -105,7 +105,7 @@ func ToAllHosts(hosts []model.Host) Hosts {
 
 type UpdateHostRequest struct {
 	Name          string       `json:"name" binding:"omitempty"`
-	Protocol      string       `json:"protocol" binding:"omitempty,oneof=udp tcp"`
+	Protocol      string       `json:"protocol" binding:"omitempty,oneof=http https"`
 	HostURL       string       `json:"hostUrl" binding:"omitempty"`
 	Port          uint16       `json:"port" binding:"omitempty,numeric,gte=1,lte=65535"`
 	TLS           tlsRequest   `json:"tls" binding:"omitempty"`
