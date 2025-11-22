@@ -2,14 +2,17 @@ package uptime
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"os"
 	"sync"
 
 	"github.com/DarknessKiller/pingopher/internal/model"
 	"github.com/DarknessKiller/pingopher/internal/service/notification"
 	"github.com/gin-gonic/gin"
 	"github.com/robfig/cron/v3"
+	"gorm.io/gorm"
 )
 
 type Scheduler struct {
@@ -34,10 +37,24 @@ func NewScheduler(service *Service, notificationService *notification.Notificati
 
 func (ps *Scheduler) Start() {
 	ctx := context.Background()
-	hosts, _ := ps.service.GetAllHosts(ctx)
 
-	for _, host := range hosts {
-		ps.scheduleHost(ctx, &host)
+	var (
+		hosts []model.Host
+		err   error
+	)
+
+	for {
+		hosts, err = ps.service.GetAllHosts(ctx)
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Fatal(err)
+		} else if err != nil {
+			continue
+		}
+		break
+	}
+
+	for i := range hosts {
+		ps.scheduleHost(ctx, &hosts[i])
 	}
 
 	ps.cron.Start()
@@ -94,11 +111,14 @@ func (ps *Scheduler) scheduleHost(ctx context.Context, host *model.Host) {
 
 func (ps *Scheduler) runPingForHost(ctx context.Context, hostID string) {
 	prevStatus, host, histories, err := ps.service.PingHost(ctx, hostID)
-	log.Printf("[%s] pinging...", host.HostURL)
 	if err != nil {
-		log.Printf("[%s] ping failed: %v", host.HostURL, err)
-		return
+		if !(os.IsTimeout(err) || errors.Is(err, gorm.ErrRecordNotFound)) {
+			log.Printf("[%s] ping failed: %v", hostID, err)
+			return
+		}
+
 	}
+	log.Printf("[%s] ping result: %s", host.HostURL, host.Status)
 
 	if host.Status == model.HostStatusDown {
 		ps.downCounts[hostID]++
