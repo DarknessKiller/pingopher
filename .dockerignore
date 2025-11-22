@@ -1,0 +1,4 @@
+.git
+.env*
+pingopher.db
+cmd/app/pingopher

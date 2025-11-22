@@ -1,0 +1,11 @@
+services:
+  pingopher:
+    container_name: pingopher
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    restart: unless-stopped
