@@ -10,6 +10,7 @@ import (
 type HistoryRepository interface {
 	Repository[model.History]
 	GetHistoryByID(ctx context.Context, historyId string) (*model.History, error)
+	GetHistoryByHostID(ctx context.Context, hostID string, limit int) ([]*model.History, error)
 	CreatePingHistory(ctx context.Context, host *model.Host, histories []*model.History) ([]*model.History, error)
 }
 
@@ -27,6 +28,12 @@ func (h *historyRepository) GetHistoryByID(ctx context.Context, historyId string
 	var history model.History
 	err := h.db.WithContext(ctx).Preload("Host").First(&history, "`id` = ?", historyId).Error
 	return &history, err
+}
+
+func (h *historyRepository) GetHistoryByHostID(ctx context.Context, hostID string, limit int) ([]*model.History, error) {
+	var histories []*model.History
+	err := h.db.WithContext(ctx).Where("host_id = ?", hostID).Order("ping_date_time desc").Limit(limit).Find(&histories).Error
+	return histories, err
 }
 
 func (h *historyRepository) CreatePingHistory(

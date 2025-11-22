@@ -86,3 +86,15 @@ func (h *Handler) PingHost(ctx *gin.Context) {
 
 	ctx.JSON(200, dto.ToHistories(histories))
 }
+
+func (h *Handler) GetHistory(ctx *gin.Context) {
+	hostID := ctx.Param("id")
+
+	histories, err := h.service.GetHistoryByHostID(ctx, hostID)
+	if err != nil {
+		util.HandleError(ctx, err)
+		return
+	}
+
+	ctx.JSON(200, dto.ToHistories(histories))
+}
