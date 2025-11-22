@@ -1,6 +1,8 @@
 package uptime_handler
 
 import (
+	"fmt"
+
 	"github.com/DarknessKiller/pingopher/internal/dto"
 	uptime "github.com/DarknessKiller/pingopher/internal/service/uptime"
 	"github.com/DarknessKiller/pingopher/internal/util"
@@ -89,8 +91,15 @@ func (h *Handler) PingHost(ctx *gin.Context) {
 
 func (h *Handler) GetHistory(ctx *gin.Context) {
 	hostID := ctx.Param("id")
+	startAt := ctx.Query("startAt")
+	endAt := ctx.Query("endAt")
 
-	histories, err := h.service.GetHistoryByHostID(ctx, hostID)
+	if startAt == "" || endAt == "" {
+		util.HandleError(ctx, fmt.Errorf("startAt and endAt parameters are required"))
+		return
+	}
+
+	histories, err := h.service.GetHistoryByHostID(ctx, hostID, startAt, endAt)
 	if err != nil {
 		util.HandleError(ctx, err)
 		return

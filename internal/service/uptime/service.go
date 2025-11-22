@@ -60,8 +60,8 @@ func (s *Service) DeleteHost(ctx context.Context, hostID string) error {
 	return s.repository.Host().Delete(ctx, hostID)
 }
 
-func (s *Service) GetHistoryByHostID(ctx context.Context, hostID string) ([]*model.History, error) {
-	return s.repository.History().GetHistoryByHostID(ctx, hostID, 100)
+func (s *Service) GetHistoryByHostID(ctx context.Context, hostID, startAt, endAt string) ([]*model.History, error) {
+	return s.repository.History().GetHistoryByHostID(ctx, hostID, startAt, endAt)
 }
 
 func (s *Service) PingHost(ctx context.Context, hostID string) (prevStatus model.HostStatus, host *model.Host, histories []*model.History, err error) {
