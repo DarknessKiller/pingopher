@@ -35,6 +35,7 @@ func Router(bs *bootstrap.Bootstrap) *gin.Engine {
 				hostGroup.PUT("", uptimeHandler.UpdateHost)
 				hostGroup.DELETE("", uptimeHandler.DeleteHost)
 				hostGroup.GET("", uptimeHandler.PingHost)
+				hostGroup.GET("/history", uptimeHandler.GetHistory)
 
 				notification := hostGroup.Group("/notification")
 				{
