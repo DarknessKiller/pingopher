@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/api.ts","./src/custom.d.ts","./src/main.tsx","./src/components/HostDetail.tsx","./src/components/HostForm.tsx","./src/components/HostList.tsx","./src/components/NotificationManager.tsx","./src/utils/date.ts","./eslint.config.ts"],"version":"5.9.3"}

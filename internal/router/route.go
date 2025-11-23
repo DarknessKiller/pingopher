@@ -16,10 +16,14 @@ func Router(bs *bootstrap.Bootstrap) *gin.Engine {
 	r.NoRoute(func(c *gin.Context) {
 		c.Status(http.StatusOK)
 	})
+	r.LoadHTMLFiles("./frontend/dist/index.html")
+	r.Static("/assets", "./frontend/dist/assets")
 
 	handler := handler.New(bs)
 	uptimeHandler := uptime_handler.New(bs.UptimeService, bs.UptimeScheduler)
 	notificationHandler := notification_handler.New(bs.NotificationService)
+
+	r.GET("/", handler.Dashboard)
 
 	v1 := r.Group("/api/v1")
 	{

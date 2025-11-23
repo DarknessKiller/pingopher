@@ -71,6 +71,9 @@ func (s *Service) GetHistoryByHostID(ctx context.Context, hostID, startAt, endAt
 		return nil, err
 	}
 
+	startTime = startTime.In(time.Local)
+	endTime = endTime.In(time.Local)
+
 	return s.repository.History().GetHistoryByHostID(ctx, hostID, startTime, endTime)
 }
 
