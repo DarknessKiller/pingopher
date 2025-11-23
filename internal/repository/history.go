@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/DarknessKiller/pingopher/internal/model"
 	"gorm.io/gorm"
@@ -10,7 +11,7 @@ import (
 type HistoryRepository interface {
 	Repository[model.History]
 	GetHistoryByID(ctx context.Context, historyId string) (*model.History, error)
-	GetHistoryByHostID(ctx context.Context, hostID, startAt, endAt string) ([]*model.History, error)
+	GetHistoryByHostID(ctx context.Context, hostID string, startAt, endAt time.Time) ([]*model.History, error)
 	CreatePingHistory(ctx context.Context, host *model.Host, histories []*model.History) ([]*model.History, error)
 }
 
@@ -31,7 +32,7 @@ func (h *historyRepository) GetHistoryByID(ctx context.Context, historyId string
 }
 
 func (r *historyRepository) GetHistoryByHostID(
-	ctx context.Context, hostID, startAt, endAt string,
+	ctx context.Context, hostID string, startAt, endAt time.Time,
 ) ([]*model.History, error) {
 
 	var histories []*model.History

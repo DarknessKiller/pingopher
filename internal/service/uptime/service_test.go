@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/DarknessKiller/pingopher/internal/config"
 	"github.com/DarknessKiller/pingopher/internal/model"
@@ -67,7 +68,7 @@ type MockHistoryRepository struct {
 	DeleteFunc             func(ctx context.Context, id string) error
 	GetHistoryByIDFunc     func(ctx context.Context, historyId string) (*model.History, error)
 	CreatePingHistoryFunc  func(ctx context.Context, host *model.Host, histories []*model.History) ([]*model.History, error)
-	GetHistoryByHostIDFunc func(ctx context.Context, hostID string, startAt, endAt string) ([]*model.History, error)
+	GetHistoryByHostIDFunc func(ctx context.Context, hostID string, startAt, endAt time.Time) ([]*model.History, error)
 }
 
 func (m *MockHistoryRepository) Create(ctx context.Context, history *model.History) error {
@@ -119,7 +120,7 @@ func (m *MockHistoryRepository) CreatePingHistory(ctx context.Context, host *mod
 	return nil, errors.New("mock CreatePingHistoryFunc not implemented")
 }
 
-func (m *MockHistoryRepository) GetHistoryByHostID(ctx context.Context, hostID, startAt, endAt string) ([]*model.History, error) {
+func (m *MockHistoryRepository) GetHistoryByHostID(ctx context.Context, hostID string, startAt, endAt time.Time) ([]*model.History, error) {
 	if m.GetHistoryByHostIDFunc != nil {
 		return m.GetHistoryByHostIDFunc(ctx, hostID, startAt, endAt)
 	}

@@ -61,7 +61,17 @@ func (s *Service) DeleteHost(ctx context.Context, hostID string) error {
 }
 
 func (s *Service) GetHistoryByHostID(ctx context.Context, hostID, startAt, endAt string) ([]*model.History, error) {
-	return s.repository.History().GetHistoryByHostID(ctx, hostID, startAt, endAt)
+	startTime, err := time.Parse(time.RFC3339, startAt)
+	if err != nil {
+		return nil, err
+	}
+
+	endTime, err := time.Parse(time.RFC3339, endAt)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.repository.History().GetHistoryByHostID(ctx, hostID, startTime, endTime)
 }
 
 func (s *Service) PingHost(ctx context.Context, hostID string) (prevStatus model.HostStatus, host *model.Host, histories []*model.History, err error) {
