@@ -93,6 +93,8 @@ func (s *Service) PingHost(ctx context.Context, hostID string) (prevStatus model
 		dnsList = []model.DNS{{Name: "System DNS"}}
 	}
 
+	pingTime := time.Now()
+
 	histories = make([]*model.History, len(dnsList))
 
 	for i, dns := range dnsList {
@@ -100,11 +102,12 @@ func (s *Service) PingHost(ctx context.Context, hostID string) (prevStatus model
 		go func() {
 			defer wg.Done()
 
-			mutex.Lock()
 			history := s.makeRequestAndBuildHistory(host, dns)
-			mutex.Unlock()
+			history.PingDateTime = sql.NullTime{Time: pingTime, Valid: true}
 
+			mutex.Lock()
 			histories[i] = history
+			mutex.Unlock()
 		}()
 	}
 
@@ -179,12 +182,8 @@ func (s *Service) makeRequestAndBuildHistory(host *model.Host, dns model.DNS) *m
 	}
 
 	return &model.History{
-		StatusCode: uint16(resp.StatusCode()),
-		Latency:    uint16(resp.Duration().Milliseconds()),
-		PingDateTime: sql.NullTime{
-			Time:  resp.ReceivedAt(),
-			Valid: true,
-		},
+		StatusCode:   uint16(resp.StatusCode()),
+		Latency:      uint16(resp.Duration().Milliseconds()),
 		HostID:       host.ID,
 		DNS:          dns,
 		ErrorMessage: errorMsg,
