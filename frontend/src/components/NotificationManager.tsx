@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   Table,
   Button,
@@ -22,6 +22,7 @@ import {
   type Notification,
   type CreateNotificationRequest,
 } from "../api";
+import ResponsiveButton from "./ResponsiveButton";
 
 const { Option } = Select;
 
@@ -32,29 +33,42 @@ interface NotificationManagerProps {
 const NotificationManager: React.FC<NotificationManagerProps> = ({ host }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
+  const [modalLoading, setModalLoading] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingNotification, setEditingNotification] = useState<
     Notification | undefined
   >(undefined);
-  const [form] = Form.useForm<CreateNotificationRequest>();
 
-  const fetchNotifications = React.useCallback(async () => {
+  const [form] = Form.useForm<CreateNotificationRequest>();
+  const controllerRef = useRef<AbortController | null>(null);
+
+  // Fetch notifications
+  const fetchNotifications = useCallback(async () => {
+    if (controllerRef.current) controllerRef.current.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+
     setLoading(true);
     try {
-      const response = await getNotifications(host.id);
-      setNotifications(response.data || []);
+      const response = await getNotifications(host.id, {
+        signal: controller.signal,
+      });
+      if (!controller.signal.aborted) {
+        setNotifications(response.data || []);
+      }
     } catch (error) {
-      message.error((error as Error).message);
+      if ((error as any).name !== "CanceledError") {
+        message.error((error as Error).message);
+      }
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, [host.id]);
 
   useEffect(() => {
-    if (host) {
-      fetchNotifications();
-    }
-  }, [host, fetchNotifications]);
+    fetchNotifications();
+    return () => controllerRef.current?.abort();
+  }, [fetchNotifications]);
 
   const handleCreate = () => {
     setEditingNotification(undefined);
@@ -80,6 +94,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ host }) => {
   };
 
   const onFinish = async (values: CreateNotificationRequest) => {
+    setModalLoading(true);
     try {
       if (editingNotification) {
         await updateNotification(host.id, editingNotification.id, values);
@@ -92,6 +107,8 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ host }) => {
       fetchNotifications();
     } catch (error) {
       message.error((error as Error).message);
+    } finally {
+      setModalLoading(false);
     }
   };
 
@@ -100,12 +117,14 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ host }) => {
       title: "Name",
       dataIndex: "name",
       key: "name",
+      sorter: (a, b) => a.name.localeCompare(b.name),
     },
     {
       title: "Type",
       dataIndex: "type",
       key: "type",
       render: (type: string) => <Tag color="blue">{type.toUpperCase()}</Tag>,
+      sorter: (a, b) => a.type.localeCompare(b.type),
     },
     {
       title: "Active",
@@ -116,6 +135,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ host }) => {
           {active ? "Active" : "Inactive"}
         </Tag>
       ),
+      sorter: (a, b) => Number(a.active) - Number(b.active),
     },
     {
       title: "Actions",
@@ -146,13 +166,16 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ host }) => {
           marginBottom: 16,
           display: "flex",
           justifyContent: "flex-end",
-          alignItems: "center",
+          gap: 8,
         }}
       >
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-          Add Notification
-        </Button>
+        <ResponsiveButton
+          text="Add Notification"
+          icon={<PlusOutlined />}
+          onClick={handleCreate}
+        />
       </div>
+
       <Table
         columns={columns}
         dataSource={notifications}
@@ -167,27 +190,30 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ host }) => {
         open={isModalVisible}
         onCancel={() => setIsModalVisible(false)}
         onOk={() => form.submit()}
-        destroyOnClose
+        confirmLoading={modalLoading}
       >
         <Form form={form} layout="vertical" onFinish={onFinish}>
           <Form.Item name="name" label="Name" rules={[{ required: true }]}>
             <Input placeholder="My Discord Alert" />
           </Form.Item>
+
           <Form.Item name="type" label="Type" rules={[{ required: true }]}>
             <Select>
               <Option value="discord">Discord</Option>
             </Select>
           </Form.Item>
+
           <Form.Item name="active" label="Active" valuePropName="checked">
             <Switch />
           </Form.Item>
 
+          {/* Conditional Discord fields */}
           <Form.Item
             noStyle
             shouldUpdate={(prev, current) => prev.type !== current.type}
           >
             {({ getFieldValue }) =>
-              getFieldValue("type") === "discord" ? (
+              getFieldValue("type") === "discord" && (
                 <>
                   <Form.Item
                     name="discordWebhookUrl"
@@ -203,7 +229,7 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ host }) => {
                     <Input.TextArea placeholder="@here" />
                   </Form.Item>
                 </>
-              ) : null
+              )
             }
           </Form.Item>
         </Form>

@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { type AxiosRequestConfig } from "axios";
 
 // Type definitions
 export interface DNS {
@@ -80,6 +80,9 @@ export interface CreateNotificationRequest {
 
 export type UpdateNotificationRequest = Partial<CreateNotificationRequest>;
 
+// New required signal type for GET requests
+type GetRequestConfig = AxiosRequestConfig & { signal: AbortSignal };
+
 const api = axios.create({
   baseURL: "/api/v1",
 });
@@ -95,21 +98,35 @@ api.interceptors.response.use(
   }
 );
 
-export const getHosts = () => api.get<{ hosts: Host[] }>("/uptime/all");
+// Host APIs
+export const getHosts = (config: GetRequestConfig) =>
+  api.get<{ hosts: Host[] }>("/uptime/all", config);
+
 export const createHost = (data: CreateHostRequest) =>
   api.post<Host>("/uptime/create", data);
+
 export const updateHost = (id: string, data: UpdateHostRequest) =>
   api.put<Host>(`/uptime/${id}`, data);
-export const deleteHost = (id: string) => api.delete(`/uptime/${id}`);
-export const getHostHistory = (id: string, startAt: string, endAt: string) =>
-  api.get(`/uptime/${id}/history`, { params: { startAt, endAt } });
 
-export const getNotifications = (hostId: string) =>
-  api.get<Notification[]>(`/uptime/${hostId}/notification`);
+export const deleteHost = (id: string) => api.delete(`/uptime/${id}`);
+
+export const getHostHistory = (
+  id: string,
+  startAt: string,
+  endAt: string,
+  config: GetRequestConfig
+) =>
+  api.get(`/uptime/${id}/history`, { params: { startAt, endAt }, ...config });
+
+// Notification APIs
+export const getNotifications = (hostId: string, config: GetRequestConfig) =>
+  api.get<Notification[]>(`/uptime/${hostId}/notification`, config);
+
 export const createNotification = (
   hostId: string,
   data: CreateNotificationRequest
 ) => api.post<Notification>(`/uptime/${hostId}/notification`, data);
+
 export const updateNotification = (
   hostId: string,
   notificationId: string,
@@ -119,6 +136,7 @@ export const updateNotification = (
     `/uptime/${hostId}/notification/${notificationId}`,
     data
   );
+
 export const deleteNotification = (hostId: string, notificationId: string) =>
   api.delete(`/uptime/${hostId}/notification/${notificationId}`);
 

@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Form,
   Input,
@@ -16,26 +16,33 @@ import {
   type CreateHostRequest,
 } from "../api";
 
-const { Option } = Select;
-
 interface HostFormProps {
   initialValues?: Host;
   onSuccess: () => void;
 }
 
+const DEFAULT_VALUES: Partial<CreateHostRequest> = {
+  protocol: "https",
+  pingInterval: 60,
+  failThreshold: 3,
+  dns: [],
+};
+
 const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
   const [form] = Form.useForm<CreateHostRequest>();
+  const [loading, setLoading] = useState(false);
 
+  // Sync form values when initialValues change
   useEffect(() => {
     if (initialValues) {
-      form.setFieldsValue(initialValues);
+      form.setFieldsValue({ ...DEFAULT_VALUES, ...initialValues });
     } else {
       form.resetFields();
+      form.setFieldsValue(DEFAULT_VALUES);
     }
   }, [initialValues, form]);
 
-  const [loading, setLoading] = React.useState(false);
-
+  // Async submit handler (React-standard)
   const onFinish = async (values: CreateHostRequest) => {
     setLoading(true);
     try {
@@ -47,26 +54,23 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
         message.success("Host created successfully");
       }
       onSuccess();
-    } catch (error) {
-      message.error((error as Error).message);
+    } catch (err) {
+      message.error((err as Error).message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Form
+    <Form<CreateHostRequest>
       form={form}
       layout="vertical"
       onFinish={onFinish}
-      initialValues={{
-        protocol: "https",
-        pingInterval: 60,
-        failThreshold: 3,
-      }}
+      initialValues={DEFAULT_VALUES}
     >
+      {/* Row 1 */}
       <Row gutter={16}>
-        <Col span={18}>
+        <Col span={16}>
           <Form.Item
             name="name"
             label="Name"
@@ -76,22 +80,25 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
           </Form.Item>
         </Col>
 
-        <Col span="6">
+        <Col span={8}>
           <Form.Item
             name="protocol"
             label="Protocol"
             rules={[{ required: true, message: "Please select protocol" }]}
           >
-            <Select>
-              <Option value="http">HTTP</Option>
-              <Option value="https">HTTPS</Option>
-            </Select>
+            <Select
+              options={[
+                { label: "HTTP", value: "http" },
+                { label: "HTTPS", value: "https" },
+              ]}
+            />
           </Form.Item>
         </Col>
       </Row>
 
+      {/* Row 2 */}
       <Row gutter={16}>
-        <Col span={18}>
+        <Col span={16}>
           <Form.Item
             name="hostUrl"
             label="Host URL/IP"
@@ -101,18 +108,19 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
           </Form.Item>
         </Col>
 
-        <Col span={6}>
+        <Col span={8}>
           <Form.Item name="port" label="Port">
             <InputNumber min={0} max={65535} style={{ width: "100%" }} />
           </Form.Item>
         </Col>
       </Row>
 
+      {/* Row 3 */}
       <Row gutter={16}>
         <Col span={12}>
           <Form.Item
             name="pingInterval"
-            label="Ping Interval (seconds)"
+            label="Ping Interval"
             rules={[{ required: true, message: "Please enter ping interval" }]}
           >
             <InputNumber min={1} style={{ width: "100%" }} />
@@ -130,6 +138,7 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
         </Col>
       </Row>
 
+      {/* DNS List */}
       <Form.List name="dns">
         {(fields, { add, remove }) => (
           <>
@@ -140,7 +149,6 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
                   display: "flex",
                   gap: 8,
                   marginBottom: 8,
-                  alignItems: "flex-start",
                   border: "1px solid #d9d9d9",
                   padding: 10,
                   borderRadius: 4,
@@ -155,6 +163,7 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
                   >
                     <Input placeholder="Google" />
                   </Form.Item>
+
                   <Form.Item
                     {...restField}
                     name={[name, "ip"]}
@@ -164,6 +173,7 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
                     <Input placeholder="8.8.8.8" />
                   </Form.Item>
                 </div>
+
                 <div style={{ flex: 1 }}>
                   <Form.Item
                     {...restField}
@@ -171,28 +181,33 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
                     rules={[{ required: true, message: "Missing Protocol" }]}
                     label="Protocol"
                   >
-                    <Select placeholder="Protocol">
-                      <Option value="udp">UDP</Option>
-                      <Option value="tcp">TCP</Option>
-                    </Select>
+                    <Select
+                      options={[
+                        { label: "UDP", value: "udp" },
+                        { label: "TCP", value: "tcp" },
+                      ]}
+                    />
                   </Form.Item>
+
                   <Form.Item
                     {...restField}
                     name={[name, "port"]}
                     rules={[{ required: true, message: "Missing Port" }]}
                     label="Port"
                   >
-                    <InputNumber style={{ width: "100%" }} placeholder="53" />
+                    <InputNumber min={1} style={{ width: "100%" }} />
                   </Form.Item>
                 </div>
+
                 <Button
                   type="text"
                   danger
                   onClick={() => remove(name)}
-                  icon={<span style={{ fontSize: 20 }}>-</span>}
+                  icon={<span style={{ fontSize: 20, lineHeight: 1 }}>−</span>}
                 />
               </div>
             ))}
+
             <Form.Item>
               <Button
                 type="dashed"
