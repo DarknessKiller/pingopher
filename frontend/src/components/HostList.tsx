@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Table,
   Button,
@@ -9,6 +9,7 @@ import {
   Row,
   Col,
   Card,
+  Select,
 } from "antd";
 import {
   EditOutlined,
@@ -21,58 +22,123 @@ import { getHosts, deleteHost, type Host } from "../api";
 import HostForm from "./HostForm";
 import HostDetail from "./HostDetail";
 import NotificationManager from "./NotificationManager";
+import type { ColumnsType } from "antd/es/table";
+import ResponsiveButton from "./ResponsiveButton";
+
+const POLL_INTERVAL = 10000;
 
 const HostList: React.FC = () => {
   const [hosts, setHosts] = useState<Host[]>([]);
+  const [sortedHosts, setSortedHosts] = useState<Host[]>([]);
   const [loading, setLoading] = useState(false);
+
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingHost, setEditingHost] = useState<Host | undefined>(undefined);
+
   const [detailVisible, setDetailVisible] = useState(false);
   const [notificationVisible, setNotificationVisible] = useState(false);
-  const [selectedHost, setSelectedHost] = useState<Host | undefined>(undefined);
 
+  const [selectedHost, setSelectedHost] = useState<Host | undefined>();
+
+  const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const fetchControllerRef = useRef<AbortController | null>(null);
+
+  // --------------------------
+  // Helpers
+  // --------------------------
+  const getHostUrl = (host: Host) => {
+    const portPart = host.port && host.port !== 0 ? `:${host.port}` : "";
+    return `${host.protocol}://${host.hostUrl}${portPart}`;
+  };
+
+  const renderStatusTag = (status: Host["status"]) => {
+    const colorMap: Record<Host["status"], string> = {
+      up: "green",
+      down: "red",
+      unknown: "gold",
+    };
+    return <Tag color={colorMap[status]}>{status.toUpperCase()}</Tag>;
+  };
+
+  const handleSort = (field: keyof Host, order: "ascend" | "descend") => {
+    const sorted = [...hosts].sort((a, b) => {
+      let compare = 0;
+      switch (field) {
+        case "name":
+          compare = a.name.localeCompare(b.name);
+          break;
+        case "status":
+          compare = a.status.localeCompare(b.status);
+          break;
+        case "pingInterval":
+          compare = a.pingInterval - b.pingInterval;
+          break;
+        case "hostUrl":
+          compare = getHostUrl(a).localeCompare(getHostUrl(b));
+          break;
+      }
+      return order === "ascend" ? compare : -compare;
+    });
+    setSortedHosts(sorted);
+  };
+
+  // --------------------------
+  // Fetch hosts
+  // --------------------------
   const fetchHosts = async (showLoading = true) => {
-    if (showLoading) setLoading(true);
+    if (fetchControllerRef.current) fetchControllerRef.current.abort();
+    const controller = new AbortController();
+    fetchControllerRef.current = controller;
+
     try {
-      const response = await getHosts();
-      setHosts(response.data.hosts);
-    } catch (error) {
-      message.error((error as Error).message);
+      if (showLoading) setLoading(true);
+      const response = await getHosts({ signal: controller.signal });
+      if (!controller.signal.aborted) {
+        setHosts(response.data.hosts);
+        setSortedHosts(response.data.hosts);
+      }
+    } catch (err) {
+      if (!controller.signal.aborted) message.error((err as Error).message);
     } finally {
-      if (showLoading) setLoading(false);
+      if (!controller.signal.aborted && showLoading) setLoading(false);
     }
   };
 
+  // --------------------------
+  // Polling effect
+  // --------------------------
   useEffect(() => {
-    let isMounted = true;
-    let timeoutId: ReturnType<typeof setTimeout>;
+    const controller = new AbortController();
 
-    const loop = async () => {
+    const runPolling = async () => {
       await fetchHosts(false);
-      if (isMounted) {
-        timeoutId = setTimeout(loop, 10000);
+      if (!controller.signal.aborted) {
+        pollTimerRef.current = setTimeout(runPolling, POLL_INTERVAL);
       }
     };
 
     fetchHosts(true).then(() => {
-      if (isMounted) {
-        timeoutId = setTimeout(loop, 10000);
+      if (!controller.signal.aborted) {
+        pollTimerRef.current = setTimeout(runPolling, POLL_INTERVAL);
       }
     });
 
     return () => {
-      isMounted = false;
-      clearTimeout(timeoutId);
+      controller.abort();
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     };
   }, []);
 
+  // --------------------------
+  // Handlers
+  // --------------------------
   const handleDelete = async (id: string) => {
     try {
       await deleteHost(id);
       message.success("Host deleted");
-      fetchHosts();
-    } catch (error) {
-      message.error((error as Error).message);
+      await fetchHosts(false);
+    } catch (err) {
+      message.error((err as Error).message);
     }
   };
 
@@ -86,9 +152,9 @@ const HostList: React.FC = () => {
     setIsModalVisible(true);
   };
 
-  const handleSuccess = () => {
+  const handleSuccess = async () => {
     setIsModalVisible(false);
-    fetchHosts();
+    await fetchHosts(false);
   };
 
   const handleShowDetail = (host: Host) => {
@@ -96,51 +162,48 @@ const HostList: React.FC = () => {
     setDetailVisible(true);
   };
 
-  const renderStatusTag = (status: string) => {
-    const colorMap: Record<string, string> = {
-      up: "green",
-      down: "red",
-      unknown: "yellow",
-    };
-    return (
-      <Tag color={colorMap[status] || "default"}>{status.toUpperCase()}</Tag>
-    );
+  const showDeleteConfirm = (host: Host) => {
+    Modal.confirm({
+      title: "Are you sure?",
+      content: "This action cannot be undone.",
+      onOk: () => handleDelete(host.id),
+    });
   };
 
-  // Responsive Table for Desktop
-  const columns = [
+  // --------------------------
+  // Table columns
+  // --------------------------
+  const columns: ColumnsType<Host> = [
     {
       title: "Name",
       dataIndex: "name",
       key: "name",
+      sorter: (a, b) => a.name.localeCompare(b.name),
     },
     {
       title: "URL",
       key: "url",
-      render: (_value: unknown, record: Host) => {
-        const portStr =
-          record.port && record.port !== 0 ? `:${record.port}` : "";
-        return `${record.protocol}://${record.hostUrl}${portStr}`;
-      },
+      render: (_, record) => getHostUrl(record),
+      sorter: (a, b) => getHostUrl(a).localeCompare(getHostUrl(b)),
     },
     {
       title: "Status",
       dataIndex: "status",
-      key: "status",
       render: renderStatusTag,
+      sorter: (a, b) => a.status.localeCompare(b.status),
     },
     {
       title: "Interval",
       dataIndex: "pingInterval",
-      key: "pingInterval",
-      render: (text: number) => `${text}s`,
+      render: (v: number) => `${v}s`,
+      sorter: (a, b) => a.pingInterval - b.pingInterval,
     },
     {
       title: "Actions",
       key: "actions",
-      align: "right" as const,
-      render: (_value: unknown, record: Host) => (
-        <Space wrap size="middle">
+      align: "right",
+      render: (_, record) => (
+        <Space size="middle">
           <Button
             icon={<BellOutlined />}
             onClick={() => {
@@ -154,21 +217,18 @@ const HostList: React.FC = () => {
           />
           <Button icon={<EditOutlined />} onClick={() => handleEdit(record)} />
           <Button
-            icon={<DeleteOutlined />}
             danger
-            onClick={() =>
-              Modal.confirm({
-                title: "Are you sure?",
-                content: "This action cannot be undone.",
-                onOk: () => handleDelete(record.id),
-              })
-            }
+            icon={<DeleteOutlined />}
+            onClick={() => showDeleteConfirm(record)}
           />
         </Space>
       ),
     },
   ];
 
+  // --------------------------
+  // Render
+  // --------------------------
   return (
     <div>
       {/* Header */}
@@ -176,16 +236,17 @@ const HostList: React.FC = () => {
         style={{
           marginBottom: 16,
           display: "flex",
-          flexWrap: "wrap",
           justifyContent: "space-between",
+          flexWrap: "wrap",
           alignItems: "center",
-          // gap: 8,
         }}
       >
         <h2 style={{ margin: 0 }}>Monitoring Hosts</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-          Add Host
-        </Button>
+        <ResponsiveButton
+          icon={<PlusOutlined />}
+          text="Add Host"
+          onClick={handleCreate}
+        />
       </div>
 
       {/* Desktop Table */}
@@ -196,55 +257,82 @@ const HostList: React.FC = () => {
           rowKey="id"
           loading={loading}
           scroll={{ x: "max-content" }}
+          onChange={(_pagination, _filters, sorter) => {
+            if (!Array.isArray(sorter) && sorter.order && sorter.field) {
+              handleSort(sorter.field as keyof Host, sorter.order);
+            } else {
+              setSortedHosts(hosts);
+            }
+          }}
         />
       </div>
 
-      {/* Mobile Card Layout */}
+      {/* Mobile Cards */}
       <div className="mobile-cards" style={{ display: "none" }}>
+        {/* Mobile sorting dropdown */}
+        <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+          <Col span={24}>
+            <Select
+              placeholder="Sort by"
+              onChange={(value) => {
+                const [field, order] = (value as string).split("-");
+                handleSort(field as keyof Host, order as "ascend" | "descend");
+              }}
+              style={{ width: 200 }}
+              allowClear
+            >
+              <Select.Option value="name-ascend">Name ↑</Select.Option>
+              <Select.Option value="name-descend">Name ↓</Select.Option>
+              <Select.Option value="status-ascend">Status ↑</Select.Option>
+              <Select.Option value="status-descend">Status ↓</Select.Option>
+              <Select.Option value="pingInterval-ascend">
+                Interval ↑
+              </Select.Option>
+              <Select.Option value="pingInterval-descend">
+                Interval ↓
+              </Select.Option>
+              <Select.Option value="url-ascend">URL ↑</Select.Option>
+              <Select.Option value="url-descend">URL ↓</Select.Option>
+            </Select>
+          </Col>
+        </Row>
+
         <Row gutter={[16, 16]}>
-          {hosts.map((host) => (
+          {(sortedHosts.length > 0 ? sortedHosts : hosts).map((host) => (
             <Col xs={24} sm={12} key={host.id}>
               <Card
                 title={host.name}
                 extra={
-                  <Space wrap size="small">
+                  <Space size="small">
                     <Button
                       icon={<BellOutlined />}
+                      size="small"
                       onClick={() => {
                         setSelectedHost(host);
                         setNotificationVisible(true);
                       }}
-                      size="small"
                     />
                     <Button
                       icon={<HistoryOutlined />}
-                      onClick={() => handleShowDetail(host)}
                       size="small"
+                      onClick={() => handleShowDetail(host)}
                     />
                     <Button
                       icon={<EditOutlined />}
-                      onClick={() => handleEdit(host)}
                       size="small"
+                      onClick={() => handleEdit(host)}
                     />
                     <Button
-                      icon={<DeleteOutlined />}
                       danger
+                      icon={<DeleteOutlined />}
                       size="small"
-                      onClick={() =>
-                        Modal.confirm({
-                          title: "Are you sure?",
-                          content: "This action cannot be undone.",
-                          onOk: () => handleDelete(host.id),
-                        })
-                      }
+                      onClick={() => showDeleteConfirm(host)}
                     />
                   </Space>
                 }
               >
                 <p>
-                  <strong>URL:</strong>{" "}
-                  {`${host.protocol}://${host.hostUrl}${host.port && host.port !== 0 ? `:${host.port}` : ""
-                    }`}
+                  <strong>URL:</strong> {getHostUrl(host)}
                 </p>
                 <p>
                   <strong>Status:</strong> {renderStatusTag(host.status)}
@@ -270,28 +358,28 @@ const HostList: React.FC = () => {
       </Modal>
 
       <Modal
-        title={`Details: ${selectedHost?.name}`}
+        title={`Details: ${selectedHost?.name ?? ""}`}
         open={detailVisible}
         onCancel={() => setDetailVisible(false)}
         footer={null}
         centered
-        width={"90%"}
+        width="90%"
       >
-        {selectedHost && <HostDetail host={selectedHost} />}
+        {selectedHost ? <HostDetail host={selectedHost} /> : null}
       </Modal>
 
       <Modal
-        title={`Notifications: ${selectedHost?.name}`}
+        title={`Notifications: ${selectedHost?.name ?? ""}`}
         open={notificationVisible}
         onCancel={() => setNotificationVisible(false)}
         footer={null}
         centered
-        width={"90%"}
+        width="90%"
       >
-        {selectedHost && <NotificationManager host={selectedHost} />}
+        {selectedHost ? <NotificationManager host={selectedHost} /> : null}
       </Modal>
 
-      {/* CSS to switch layouts based on screen size */}
+      {/* Responsive CSS */}
       <style>
         {`
           @media (min-width: 768px) {

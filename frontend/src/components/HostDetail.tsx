@@ -23,80 +23,102 @@ const TIME_RANGES = [
   { label: "Last 24 hours", value: "24h" },
   { label: "Last 7 days", value: "7d" },
   { label: "Last 30 days", value: "30d" },
-];
+] as const;
 
 const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const chartRef = useRef<Line | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<ParsedHistory[]>([]);
-  const [range, setRange] = useState("30m");
+  const [range, setRange] =
+    useState<(typeof TIME_RANGES)[number]["value"]>("30m");
 
+  // Reset time range when host changes
   useEffect(() => {
     setRange("30m");
+    setData([]);
   }, [host]);
 
+  // ---- Async polling effect ----
   useEffect(() => {
-    let isMounted = true;
-    let timeoutId: ReturnType<typeof setTimeout>;
+    if (!host) return;
 
-    const fetchHistory = async (showLoading = true) => {
-      if (!host) return;
-      if (showLoading) setLoading(true);
+    const controller = new AbortController();
+    let refreshTimer: NodeJS.Timeout | null = null;
 
+    const fetchHistoryAsync = async () => {
+      setLoading(true);
       const { startAt, endAt } = computeRange(range);
 
       try {
-        const response = await getHostHistory(host.id, startAt, endAt);
-        if (!isMounted) return;
-        const results = response.data.results || [];
+        const response = await getHostHistory(host.id, startAt, endAt, {
+          signal: controller.signal,
+        });
 
-        const parsedData: ParsedHistory[] = results.map((item: Result) => ({
+        if (controller.signal.aborted) return;
+
+        const results: Result[] = response.data?.results ?? [];
+        const parsed: ParsedHistory[] = results.map((item) => ({
           latencyValue: parseInt(item.latency.replace(" ms", ""), 10),
           time: new Date(item.timestamp).toLocaleString(),
           dns: item.dns,
         }));
 
-        setData(parsedData);
-      } catch (error) {
-        if (!isMounted) return;
-        console.error(error);
-        message.error((error as Error).message);
-      } finally {
-        if (isMounted) {
-          if (showLoading) setLoading(false);
-          timeoutId = setTimeout(() => fetchHistory(false), 10000);
+        setData(parsed);
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          console.error(err);
+          message.error((err as Error).message);
         }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
 
-    fetchHistory(true);
+    const runPolling = async () => {
+      await fetchHistoryAsync();
+      if (!controller.signal.aborted) {
+        refreshTimer = setTimeout(runPolling, 10_000);
+      }
+    };
+
+    runPolling();
 
     return () => {
-      isMounted = false;
-      clearTimeout(timeoutId);
+      controller.abort();
+      if (refreshTimer) clearTimeout(refreshTimer);
     };
   }, [host, range]);
 
+  // ---- Initialize Chart Once ----
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || chartRef.current) return;
 
-    const old = containerRef.current.querySelector("canvas");
-    if (old) old.remove();
-
-    if (data.length === 0) return;
-
-    const line = new Line(containerRef.current, {
-      data,
+    chartRef.current = new Line(containerRef.current, {
+      data: [],
       xField: "time",
       yField: "latencyValue",
       seriesField: "dns",
       yAxis: { label: { formatter: (v) => `${v} ms` } },
       legend: { position: "top" },
       smooth: true,
+      lineStyle: { lineWidth: 2 },
     });
 
-    line.render();
-    return () => line.destroy();
+    chartRef.current.render();
+
+    return () => {
+      chartRef.current?.destroy();
+      chartRef.current = null;
+    };
+  }, []);
+
+  // ---- Update chart when data changes ----
+  useEffect(() => {
+    if (!chartRef.current) return;
+
+    chartRef.current.changeData(data.length ? data : []);
   }, [data]);
 
   return (

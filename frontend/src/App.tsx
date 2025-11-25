@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Layout, Typography, ConfigProvider, Switch, theme } from "antd";
+import React, { useEffect, useState } from "react";
+import { ConfigProvider, Layout, Switch, theme, Typography } from "antd";
 import HostList from "./components/HostList";
 
 const { Header, Content, Footer } = Layout;
@@ -22,8 +22,13 @@ const App: React.FC = () => {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = (e: MediaQueryListEvent) => setDarkMode(e.matches);
     mediaQuery.addEventListener("change", handleChange);
+
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
+
+  useEffect(() => {
+    document.documentElement.style.background = darkMode ? "black" : "";
+  }, [darkMode]);
 
   return (
     <ConfigProvider
