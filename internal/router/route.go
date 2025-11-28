@@ -20,7 +20,7 @@ func Router(bs *bootstrap.Bootstrap) *gin.Engine {
 	r.Static("/assets", "./frontend/dist/assets")
 
 	handler := handler.New(bs)
-	uptimeHandler := uptime_handler.New(bs.UptimeService, bs.UptimeScheduler)
+	uptimeHandler := uptime_handler.New(bs.UptimeService, bs.NotificationService, bs.UptimeScheduler)
 	notificationHandler := notification_handler.New(bs.NotificationService)
 
 	r.GET("/", handler.Dashboard)
@@ -34,10 +34,10 @@ func Router(bs *bootstrap.Bootstrap) *gin.Engine {
 		{
 			uptime.POST("/create", uptimeHandler.CreateHost)
 			uptime.GET("/all", uptimeHandler.GetAllHosts)
-			hostGroup := uptime.Group("/:id")
+			hostGroup := uptime.Group("/:hostId")
 			{
 				hostGroup.PUT("", uptimeHandler.UpdateHost)
-				hostGroup.DELETE("", uptimeHandler.DeleteHost)
+				hostGroup.DELETE("", uptimeHandler.DeleteHostAndNotifications)
 				hostGroup.GET("", uptimeHandler.PingHost)
 				hostGroup.GET("/history", uptimeHandler.GetHistory)
 
@@ -45,8 +45,8 @@ func Router(bs *bootstrap.Bootstrap) *gin.Engine {
 				{
 					notification.POST("", notificationHandler.CreateNotification)
 					notification.GET("", notificationHandler.GetAllNotificationsForHost)
-					notification.DELETE("/:id", notificationHandler.DeleteNotification)
-					notification.PUT(":id", notificationHandler.UpdateNotification)
+					notification.DELETE("/:notificationId", notificationHandler.DeleteNotification)
+					notification.PUT(":notificationId", notificationHandler.UpdateNotification)
 				}
 			}
 		}

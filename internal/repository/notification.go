@@ -12,6 +12,8 @@ type NotificationRepository interface {
 	Repository[model.Notification]
 	GetActiveNotificationsForHost(ctx context.Context, hostID string) ([]model.Notification, error)
 	UpdateLastNotifiedAt(ctx context.Context, id string) error
+	GetNotificationsForHost(ctx context.Context, hostID string) ([]model.Notification, error)
+	DeleteNotifications(ctx context.Context, hostID string) error
 }
 
 type notificationRepository struct {
@@ -44,4 +46,8 @@ func (r *notificationRepository) GetNotificationsForHost(ctx context.Context, ho
 		return nil, err
 	}
 	return notifications, nil
+}
+
+func (r *notificationRepository) DeleteNotifications(ctx context.Context, hostID string) error {
+	return r.db.WithContext(ctx).Where("`host_id` = ?", hostID).Delete(&model.Notification{}).Error
 }

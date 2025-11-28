@@ -5,21 +5,33 @@ import (
 	"log"
 
 	"github.com/DarknessKiller/pingopher/internal/config"
+	"github.com/DarknessKiller/pingopher/internal/model"
 	"github.com/kofj/gorm-driver-d1/gormd1"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
 func InitiateDatabase(cfg *config.Config) *gorm.DB {
+	var db *gorm.DB
 	switch cfg.DatabaseType {
 	case "sqlite":
-		return InitiateSQLiteDatabase(cfg)
+		db = InitiateSQLiteDatabase(cfg)
 	case "d1":
-		return InitiateD1Database(cfg)
+		db = InitiateD1Database(cfg)
 	default:
 		log.Fatal("Unsupported database type:", cfg.DatabaseType)
 		return nil
 	}
+
+	if err := db.AutoMigrate(
+		&model.Host{},
+		&model.History{},
+		&model.Notification{},
+	); err != nil {
+		log.Fatal("Failed to migrate database:", err)
+	}
+
+	return db
 }
 
 // SQLite

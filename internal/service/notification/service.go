@@ -2,6 +2,7 @@ package notification
 
 import (
 	"context"
+	"errors"
 	"log"
 
 	"github.com/DarknessKiller/pingopher/internal/model"
@@ -27,16 +28,39 @@ func (ns *NotificationService) CreateNotification(ctx context.Context, hostId st
 	return ns.repo.Notification().Create(ctx, notification)
 }
 
-func (ns *NotificationService) GetNotificationsForHost(ctx context.Context, hostID string) ([]model.Notification, error) {
-	return ns.repo.Notification().GetActiveNotificationsForHost(ctx, hostID)
+func (ns *NotificationService) GetNotificationsForHost(ctx context.Context, hostId string) ([]model.Notification, error) {
+	notifications, err := ns.repo.Notification().GetNotificationsForHost(ctx, hostId)
+	if err != nil {
+		return nil, err
+	}
+
+	return notifications, nil
 }
 
-func (ns *NotificationService) DeleteNotification(ctx context.Context, id string) error {
-	return ns.repo.Notification().Delete(ctx, id)
+func (ns *NotificationService) DeleteNotification(ctx context.Context, hostId, notificationId string) error {
+	notification, err := ns.repo.Notification().GetByID(ctx, notificationId)
+	if err != nil {
+		return err
+	}
+
+	if notification.HostID.String() != hostId {
+		return errors.New("notification not found")
+	}
+
+	return ns.repo.Notification().Delete(ctx, notificationId)
 }
 
-func (ns *NotificationService) UpdateNotification(ctx context.Context, id string, notification *model.Notification) error {
-	return ns.repo.Notification().Update(ctx, id, notification)
+func (ns *NotificationService) UpdateNotification(ctx context.Context, hostId, notificationId string, notification *model.Notification) error {
+	oldNotification, err := ns.repo.Notification().GetByID(ctx, notificationId)
+	if err != nil {
+		return err
+	}
+
+	if oldNotification.HostID.String() != hostId {
+		return errors.New("notification not found")
+	}
+
+	return ns.repo.Notification().Update(ctx, notificationId, notification)
 }
 
 func (ns *NotificationService) SendNotification(host *model.Host, histories []*model.History) {
@@ -56,6 +80,11 @@ func (ns *NotificationService) SendNotification(host *model.Host, histories []*m
 			log.Printf("[%s] failed to update LastNotifiedAt: %v", host.HostURL, updateErr)
 		}
 	}
+}
+
+func (ns *NotificationService) DeleteNotifications(ctx context.Context, hostId string) error {
+	return ns.repo.Notification().DeleteNotifications(ctx, hostId)
+
 }
 
 func (ns *NotificationService) sendOne(n *model.Notification, host *model.Host, histories []*model.History) error {
