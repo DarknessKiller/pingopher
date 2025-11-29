@@ -28,18 +28,18 @@ func ToHistories(histories []*model.History) Histories {
 	n := len(histories)
 	results := make([]Result, n)
 
-	for i, h := range histories {
-		dnsName := h.DNS.Name
+	for i, history := range histories {
+		dnsName := history.DNS.Name
 		if dnsName == "" {
 			dnsName = "System DNS"
 		}
 
 		results[i] = Result{
 			DNS:        dnsName,
-			StatusCode: h.StatusCode,
-			Latency:    formatLatency(h.Latency),
-			Timestamp:  h.PingDateTime.Time,
-			ErrorMsg:   h.ErrorMessage,
+			StatusCode: history.StatusCode,
+			Latency:    formatLatency(history.Latency),
+			Timestamp:  history.CreatedAt,
+			ErrorMsg:   history.ErrorMessage,
 		}
 	}
 
