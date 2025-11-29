@@ -34,7 +34,7 @@ type Host struct {
 }
 
 type TLS struct {
-	NoVerify bool `json:"no_verify"`
+	NoVerify *bool `json:"no_verify"`
 }
 
 func (t TLS) Value() (driver.Value, error) {

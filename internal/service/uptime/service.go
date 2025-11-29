@@ -166,7 +166,7 @@ func (s *Service) makeRequestAndBuildHistory(host *model.Host, dns model.DNS) *m
 		hostURL += ":" + strconv.Itoa(int(host.Port))
 	}
 
-	if host.TLS.NoVerify {
+	if host.TLS.NoVerify != nil && *host.TLS.NoVerify {
 		client.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	}
 
