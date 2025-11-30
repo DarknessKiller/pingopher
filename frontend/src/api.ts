@@ -16,6 +16,7 @@ export interface Host {
   port: number;
   pingInterval: number;
   failThreshold: number;
+  acceptedStatusCodes: string[];
   status: string;
   dns?: DNS[];
   createdAt: string;
@@ -60,6 +61,7 @@ export interface CreateHostRequest {
   port: number;
   pingInterval: number;
   failThreshold: number;
+  acceptedStatusCodes: string[];
   dns?: DNS[];
 }
 

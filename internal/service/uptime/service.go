@@ -13,6 +13,7 @@ import (
 	"github.com/DarknessKiller/pingopher/internal/config"
 	"github.com/DarknessKiller/pingopher/internal/model"
 	"github.com/DarknessKiller/pingopher/internal/repository"
+	"github.com/DarknessKiller/pingopher/internal/util"
 	"resty.dev/v3"
 )
 
@@ -60,7 +61,7 @@ func (s *Service) DeleteHost(ctx context.Context, hostID string) error {
 	return s.repository.Host().Delete(ctx, hostID)
 }
 
-func (s *Service) GetHistoryByHostID(ctx context.Context, hostID, startAt, endAt string) ([]*model.History, error) {
+func (s *Service) GetHistoryByHostID(ctx context.Context, hostID, startAt, endAt string, status []string) ([]*model.History, error) {
 	startTime, err := time.Parse(time.RFC3339, startAt)
 	if err != nil {
 		return nil, err
@@ -74,7 +75,7 @@ func (s *Service) GetHistoryByHostID(ctx context.Context, hostID, startAt, endAt
 	startTime = startTime.In(time.Local)
 	endTime = endTime.In(time.Local)
 
-	return s.repository.History().GetHistoryByHostID(ctx, hostID, startTime, endTime)
+	return s.repository.History().GetHistoryByHostID(ctx, hostID, startTime, endTime, &status)
 }
 
 func (s *Service) PingHost(ctx context.Context, hostID string) (prevStatus model.HostStatus, host *model.Host, histories []*model.History, err error) {
@@ -115,8 +116,10 @@ func (s *Service) PingHost(ctx context.Context, hostID string) (prevStatus model
 
 	anyDown := false
 	for _, history := range histories {
-		if history.StatusCode < 200 || history.StatusCode >= 300 || history.StatusCode == 0 {
+		if ok, err := util.CheckStatusCode(history.StatusCode, host.AcceptedStatusCodes); !ok {
 			anyDown = true
+		} else if err != nil {
+			return "", nil, nil, err
 		}
 	}
 

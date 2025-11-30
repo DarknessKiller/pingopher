@@ -5,13 +5,14 @@ import (
 	"time"
 
 	"github.com/DarknessKiller/pingopher/internal/model"
+	"github.com/DarknessKiller/pingopher/internal/util"
 	"gorm.io/gorm"
 )
 
 type HistoryRepository interface {
 	Repository[model.History]
 	GetHistoryByID(ctx context.Context, historyId string) (*model.History, error)
-	GetHistoryByHostID(ctx context.Context, hostID string, startAt, endAt time.Time) ([]*model.History, error)
+	GetHistoryByHostID(ctx context.Context, hostID string, startAt, endAt time.Time, status *[]string) ([]*model.History, error)
 	CreatePingHistory(ctx context.Context, host *model.Host, histories []*model.History) ([]*model.History, error)
 }
 
@@ -32,18 +33,34 @@ func (h *historyRepository) GetHistoryByID(ctx context.Context, historyId string
 }
 
 func (r *historyRepository) GetHistoryByHostID(
-	ctx context.Context, hostID string, startAt, endAt time.Time,
+	ctx context.Context,
+	hostID string,
+	startAt, endAt time.Time,
+	status *[]string,
 ) ([]*model.History, error) {
-
 	var histories []*model.History
 
-	err := r.db.WithContext(ctx).
+	query := r.db.WithContext(ctx).
 		Where("host_id = ?", hostID).
 		Where("ping_date_time BETWEEN ? AND ?", startAt, endAt).
-		Order("ping_date_time ASC").
-		Find(&histories).Error
+		Order("ping_date_time ASC")
 
-	return histories, err
+	if status != nil && len(*status) > 0 {
+		statusCodes, err := util.ParseStatusCode(*status)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(statusCodes) > 0 {
+			query = query.Where("status_code IN ?", statusCodes)
+		}
+	}
+
+	err := query.Debug().Find(&histories).Error
+	if err != nil {
+		return nil, err
+	}
+	return histories, nil
 }
 
 func (h *historyRepository) CreatePingHistory(

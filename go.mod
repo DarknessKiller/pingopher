@@ -7,6 +7,7 @@ require (
 	github.com/go-playground/validator/v10 v10.27.0
 	github.com/joho/godotenv v1.5.1
 	github.com/kofj/gorm-driver-d1 v1.0.0-rc1
+	github.com/lib/pq v1.10.9
 	github.com/robfig/cron/v3 v3.0.0
 	github.com/segmentio/ksuid v1.0.4
 	gorm.io/driver/sqlite v1.6.0

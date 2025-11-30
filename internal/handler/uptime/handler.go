@@ -108,7 +108,13 @@ func (h *Handler) GetHistory(ctx *gin.Context) {
 		return
 	}
 
-	histories, err := h.service.GetHistoryByHostID(ctx, hostID, startAt, endAt)
+	host, err := h.service.GetHostByID(ctx, hostID)
+	if err != nil {
+		util.HandleError(ctx, err)
+		return
+	}
+
+	histories, err := h.service.GetHistoryByHostID(ctx, hostID, startAt, endAt, host.AcceptedStatusCodes)
 	if err != nil {
 		util.HandleError(ctx, err)
 		return

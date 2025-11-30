@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
 
@@ -18,15 +19,16 @@ const (
 
 type Host struct {
 	BaseModel
-	Name          string     `gorm:"type:varchar(255);not null;index:idx_host_name"`
-	Protocol      string     `gorm:"type:varchar(6);not null"`
-	HostURL       string     `gorm:"type:varchar(255);not null;index:uniq_host_url_port,priority:1"`
-	Port          uint16     `gorm:"type:smallint unsigned;not null;index:uniq_host_url_port,priority:2"`
-	TLS           TLS        `gorm:"type:json"`
-	DNS           DNSs       `gorm:"type:json"`
-	PingInterval  uint16     `gorm:"type:smallint unsigned;not null"`
-	FailThreshold uint16     `gorm:"type:smallint unsigned;not null"`
-	Status        HostStatus `gorm:"type:varchar(8);not null;index:idx_host_status"`
+	Name                string         `gorm:"type:varchar(255);not null;index:idx_host_name"`
+	Protocol            string         `gorm:"type:varchar(6);not null"`
+	HostURL             string         `gorm:"type:varchar(255);not null;index:uniq_host_url_port,priority:1"`
+	Port                uint16         `gorm:"type:smallint unsigned;not null;index:uniq_host_url_port,priority:2"`
+	TLS                 TLS            `gorm:"type:json"`
+	DNS                 DNSs           `gorm:"type:json"`
+	PingInterval        uint16         `gorm:"type:smallint unsigned;not null"`
+	FailThreshold       uint16         `gorm:"type:smallint unsigned;not null"`
+	AcceptedStatusCodes pq.StringArray `gorm:"type:varchar(255);not null;default:'200-299'"`
+	Status              HostStatus     `gorm:"type:varchar(8);not null;index:idx_host_status"`
 	Timestamps
 	DeletedAt gorm.DeletedAt `gorm:"index"`
 

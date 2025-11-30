@@ -1,4 +1,4 @@
-package uptime
+package uptime_test
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/DarknessKiller/pingopher/internal/config"
 	"github.com/DarknessKiller/pingopher/internal/model"
+	"github.com/DarknessKiller/pingopher/internal/service/uptime"
 	"github.com/segmentio/ksuid"
 )
 
@@ -68,7 +69,7 @@ type MockHistoryRepository struct {
 	DeleteFunc             func(ctx context.Context, id string) error
 	GetHistoryByIDFunc     func(ctx context.Context, historyId string) (*model.History, error)
 	CreatePingHistoryFunc  func(ctx context.Context, host *model.Host, histories []*model.History) ([]*model.History, error)
-	GetHistoryByHostIDFunc func(ctx context.Context, hostID string, startAt, endAt time.Time) ([]*model.History, error)
+	GetHistoryByHostIDFunc func(ctx context.Context, hostID string, startAt, endAt time.Time, status *[]string) ([]*model.History, error)
 }
 
 func (m *MockHistoryRepository) Create(ctx context.Context, history *model.History) error {
@@ -120,9 +121,9 @@ func (m *MockHistoryRepository) CreatePingHistory(ctx context.Context, host *mod
 	return nil, errors.New("mock CreatePingHistoryFunc not implemented")
 }
 
-func (m *MockHistoryRepository) GetHistoryByHostID(ctx context.Context, hostID string, startAt, endAt time.Time) ([]*model.History, error) {
+func (m *MockHistoryRepository) GetHistoryByHostID(ctx context.Context, hostID string, startAt, endAt time.Time, status *[]string) ([]*model.History, error) {
 	if m.GetHistoryByHostIDFunc != nil {
-		return m.GetHistoryByHostIDFunc(ctx, hostID, startAt, endAt)
+		return m.GetHistoryByHostIDFunc(ctx, hostID, startAt, endAt, status)
 	}
 	return nil, errors.New("mock GetHistoryByHostIDFunc not implemented")
 }
@@ -131,7 +132,7 @@ func TestService_CreateHost(t *testing.T) {
 	mockHostRepo := &MockHostRepository{}
 	mockHistoryRepo := &MockHistoryRepository{}
 	cfg := &config.Config{}
-	svc := NewService(cfg, mockHostRepo, mockHistoryRepo)
+	svc := uptime.NewService(cfg, mockHostRepo, mockHistoryRepo)
 
 	t.Run("Success", func(t *testing.T) {
 		mockHostRepo.CreateFunc = func(ctx context.Context, host *model.Host) error {
@@ -161,7 +162,7 @@ func TestService_PingHost(t *testing.T) {
 	mockHostRepo := &MockHostRepository{}
 	mockHistoryRepo := &MockHistoryRepository{}
 	cfg := &config.Config{Env: "test"}
-	svc := NewService(cfg, mockHostRepo, mockHistoryRepo)
+	svc := uptime.NewService(cfg, mockHostRepo, mockHistoryRepo)
 
 	t.Run("Success", func(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -176,11 +177,12 @@ func TestService_PingHost(t *testing.T) {
 
 		hostID := ksuid.New()
 		mockHost := &model.Host{
-			BaseModel: model.BaseModel{ID: hostID},
-			HostURL:   hostStr,
-			Port:      uint16(port),
-			Protocol:  "http",
-			Status:    model.HostStatusUnknown,
+			BaseModel:           model.BaseModel{ID: hostID},
+			HostURL:             hostStr,
+			Port:                uint16(port),
+			Protocol:            "http",
+			Status:              model.HostStatusUnknown,
+			AcceptedStatusCodes: []string{"200-299"},
 		}
 
 		mockHostRepo.GetByIDFunc = func(ctx context.Context, id string) (*model.Host, error) {
@@ -226,11 +228,12 @@ func TestService_PingHost(t *testing.T) {
 
 		hostID := ksuid.New()
 		mockHost := &model.Host{
-			BaseModel: model.BaseModel{ID: hostID},
-			HostURL:   hostStr,
-			Port:      uint16(port),
-			Protocol:  "http",
-			Status:    model.HostStatusUnknown,
+			BaseModel:           model.BaseModel{ID: hostID},
+			HostURL:             hostStr,
+			Port:                uint16(port),
+			Protocol:            "http",
+			Status:              model.HostStatusUnknown,
+			AcceptedStatusCodes: []string{"200-299"},
 		}
 
 		mockHostRepo.GetByIDFunc = func(ctx context.Context, id string) (*model.Host, error) {
