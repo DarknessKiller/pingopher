@@ -17,6 +17,7 @@ export interface Host {
   pingInterval: number;
   failThreshold: number;
   acceptedStatusCodes: string[];
+  tls: { no_verify: boolean };
   status: string;
   dns?: DNS[];
   createdAt: string;
@@ -62,6 +63,7 @@ export interface CreateHostRequest {
   pingInterval: number;
   failThreshold: number;
   acceptedStatusCodes: string[];
+  tls: { no_verify: boolean };
   dns?: DNS[];
 }
 
