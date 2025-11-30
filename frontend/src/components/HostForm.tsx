@@ -8,6 +8,8 @@ import {
   message,
   Row,
   Col,
+  Collapse,
+  Checkbox,
 } from "antd";
 import {
   createHost,
@@ -137,53 +139,6 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
             <InputNumber min={1} style={{ width: "100%" }} />
           </Form.Item>
         </Col>
-        </Row>
-
-        <Row gutter={16}>
-        <Col span={12}>
-          <Form.Item
-            name="acceptedStatusCodes"
-            label="Accepted Status Codes"
-            rules={[
-              {
-                required: true,
-                message: "Please enter accepted status code patterns",
-              },
-            ]}
-            tooltip={
-              <>
-                Supported formats:
-                <br />• Single: <code>200</code>
-                <br />• Range: <code>200-299</code>
-                <br />• Wildcard: <code>2xx</code>, <code>20x</code>,{" "}
-                <code>2*</code>
-                <br />• Mix any of the above
-              </>
-            }
-          >
-            <Select
-              mode="tags"
-              placeholder="Type status codes or select common patterns"
-              tokenSeparators={[","]}
-              allowClear
-              options={[
-                { label: "200 OK", value: "200" },
-                { label: "201 Created", value: "201" },
-                { label: "204 No Content", value: "204" },
-                { label: "301 Redirect", value: "301" },
-                { label: "302 Redirect", value: "302" },
-                { label: "200–299", value: "200-299" },
-                { label: "400–499", value: "400-499" },
-                { label: "500–599", value: "500-599" },
-                { label: "2xx", value: "2xx" },
-                { label: "4xx", value: "4xx" },
-                { label: "5xx", value: "5xx" },
-                { label: "20x", value: "20x" },
-                { label: "50x", value: "50x" },
-              ]}
-            />
-          </Form.Item>
-        </Col>
       </Row>
 
       {/* DNS List */}
@@ -269,6 +224,61 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
           </>
         )}
       </Form.List>
+
+      <Collapse style={{ marginBottom: 24 }}>
+        <Collapse.Panel header="Advanced" key="1">
+          <Form.Item name={["tls", "no_verify"]}>
+            <Checkbox>Ignore TLS/SSL errors for HTTPS websites</Checkbox>
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="acceptedStatusCodes"
+                label="Accepted Status Codes"
+                rules={[
+                  {
+                    required: true,
+                    message: "Please enter accepted status code patterns",
+                  },
+                ]}
+                tooltip={
+                  <>
+                    Supported formats:
+                    <br />• Single: <code>200</code>
+                    <br />• Range: <code>200-299</code>
+                    <br />• Wildcard: <code>2xx</code>, <code>20x</code>,{" "}
+                    <code>2*</code>
+                    <br />• Mix any of the above
+                  </>
+                }
+              >
+                <Select
+                  mode="tags"
+                  placeholder="Type status codes or select common patterns"
+                  tokenSeparators={[","]}
+                  allowClear
+                  options={[
+                    { label: "200 OK", value: "200" },
+                    { label: "201 Created", value: "201" },
+                    { label: "204 No Content", value: "204" },
+                    { label: "301 Redirect", value: "301" },
+                    { label: "302 Redirect", value: "302" },
+                    { label: "200–299", value: "200-299" },
+                    { label: "400–499", value: "400-499" },
+                    { label: "500–599", value: "500-599" },
+                    { label: "2xx", value: "2xx" },
+                    { label: "4xx", value: "4xx" },
+                    { label: "5xx", value: "5xx" },
+                    { label: "20x", value: "20x" },
+                    { label: "50x", value: "50x" },
+                  ]}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Collapse.Panel>
+      </Collapse>
 
       <Form.Item style={{ marginBottom: 0 }}>
         <Button type="primary" htmlType="submit" block loading={loading}>
