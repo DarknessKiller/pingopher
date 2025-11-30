@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ConfigProvider, Layout, Switch, theme, Typography } from "antd";
+import { ConfigProvider, Layout, Switch, theme, Typography, App as AntdApp } from "antd";
 import HostList from "./components/HostList";
 
 const { Header, Content, Footer } = Layout;
@@ -39,6 +39,7 @@ const App: React.FC = () => {
         },
       }}
     >
+      <AntdApp>
       <Layout className="layout" style={{ minHeight: "100vh" }}>
         <Header
           style={{
@@ -92,6 +93,7 @@ const App: React.FC = () => {
           Pingopher ©{new Date().getFullYear()} Created by DarknessKiller
         </Footer>
       </Layout>
+      </AntdApp>
     </ConfigProvider>
   );
 };

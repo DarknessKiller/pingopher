@@ -10,6 +10,7 @@ import {
   Col,
   Card,
   Select,
+  App,
 } from "antd";
 import {
   EditOutlined,
@@ -28,6 +29,7 @@ import ResponsiveButton from "./ResponsiveButton";
 const POLL_INTERVAL = 10000;
 
 const HostList: React.FC = () => {
+  const {modal} = App.useApp();
   const [hosts, setHosts] = useState<Host[]>([]);
   const [sortedHosts, setSortedHosts] = useState<Host[]>([]);
   const [loading, setLoading] = useState(false);
@@ -163,9 +165,10 @@ const HostList: React.FC = () => {
   };
 
   const showDeleteConfirm = (host: Host) => {
-    Modal.confirm({
+    modal.confirm({
       title: "Are you sure?",
       content: "This action cannot be undone.",
+      centered: true,
       onOk: () => handleDelete(host.id),
     });
   };

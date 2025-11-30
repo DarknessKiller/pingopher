@@ -10,6 +10,7 @@ import {
   message,
   Space,
   Tag,
+  App,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
@@ -31,6 +32,7 @@ interface NotificationManagerProps {
 }
 
 const NotificationManager: React.FC<NotificationManagerProps> = ({ host }) => {
+  const { modal } = App.useApp();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
@@ -148,8 +150,10 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ host }) => {
             icon={<DeleteOutlined />}
             danger
             onClick={() =>
-              Modal.confirm({
+              modal.confirm({
                 title: "Are you sure?",
+                content: "This action cannot be undone.",
+                centered: true,
                 onOk: () => handleDelete(record.id),
               })
             }
