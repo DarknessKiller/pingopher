@@ -23,6 +23,10 @@ func InitiateDatabase(cfg *config.Config) *gorm.DB {
 		return nil
 	}
 
+	if cfg.Env == "development" {
+		db = db.Debug()
+	}
+
 	if err := db.AutoMigrate(
 		&model.Host{},
 		&model.History{},
