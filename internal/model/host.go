@@ -27,7 +27,7 @@ type Host struct {
 	DNS                 DNSs           `gorm:"type:json"`
 	PingInterval        uint16         `gorm:"type:smallint unsigned;not null"`
 	FailThreshold       uint16         `gorm:"type:smallint unsigned;not null"`
-	AcceptedStatusCodes pq.StringArray `gorm:"type:varchar(255);not null;default:'200-299'"`
+	AcceptedStatusCodes pq.StringArray `gorm:"type:varchar(255);not null"`
 	Status              HostStatus     `gorm:"type:varchar(8);not null;index:idx_host_status"`
 	Timestamps
 	DeletedAt gorm.DeletedAt `gorm:"index"`

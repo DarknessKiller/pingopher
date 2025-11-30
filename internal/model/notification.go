@@ -19,8 +19,8 @@ type Notification struct {
 	Host           Host             `gorm:"foreignKey:HostID;references:ID;-:migration;->"`
 	Name           string           `gorm:"type:varchar(255);not null"`
 	Type           NotificationType `gorm:"type:varchar(50);index:idx_notification_host,priority:2;not null"`
-	Active         bool
-	LastNotifiedAt sql.NullTime `gorm:"index"`
+	Active         bool             `gorm:"type:boolean;not null"`
+	LastNotifiedAt sql.NullTime     `gorm:"index"`
 
 	// === Discord-specific fields  ===
 	DiscordUsername      string `gorm:"type:varchar(100)"`
