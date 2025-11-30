@@ -160,7 +160,7 @@ func (s *Service) makeRequestAndBuildHistory(host *model.Host, dns model.DNS) *m
 			},
 		}
 
-		client = resty.NewWithDialer(dialer)
+		client = resty.NewWithDialer(dialer).SetTimeout(10 * time.Second)
 		defer client.Close()
 	}
 
