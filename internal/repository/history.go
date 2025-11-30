@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/DarknessKiller/pingopher/internal/model"
@@ -46,17 +47,18 @@ func (r *historyRepository) GetHistoryByHostID(
 		Order("ping_date_time ASC")
 
 	if status != nil && len(*status) > 0 {
-		statusCodes, err := util.ParseStatusCode(*status)
+		statusRange, err := util.ParseStatusCode(*status)
 		if err != nil {
 			return nil, err
 		}
 
-		if len(statusCodes) > 0 {
-			query = query.Where("status_code IN ?", statusCodes)
+		if len(statusRange) > 0 {
+			whereClause, args := buildStatusWhereClause(statusRange)
+			query = query.Where(whereClause, args...)
 		}
 	}
 
-	err := query.Debug().Find(&histories).Error
+	err := query.Find(&histories).Error
 	if err != nil {
 		return nil, err
 	}
@@ -85,4 +87,21 @@ func (h *historyRepository) CreatePingHistory(
 	}
 
 	return histories, err
+}
+
+func buildStatusWhereClause(ranges []util.StatusCodeRange) (string, []interface{}) {
+	var parts []string
+	var args []interface{}
+
+	for _, r := range ranges {
+		if r.From == r.To {
+			parts = append(parts, "status_code = ?")
+			args = append(args, r.From)
+		} else {
+			parts = append(parts, "(status_code BETWEEN ? AND ?)")
+			args = append(args, r.From, r.To)
+		}
+	}
+
+	return strings.Join(parts, " OR "), args
 }

@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+type StatusCodeRange struct {
+	From uint16
+	To   uint16
+}
+
 func CheckStatusCode(status uint16, acceptedPatterns []string) (bool, error) {
 	if len(acceptedPatterns) == 0 {
 		return false, errors.New("no accepted status codes provided")
@@ -30,14 +35,12 @@ func CheckStatusCode(status uint16, acceptedPatterns []string) (bool, error) {
 	return false, nil
 }
 
-func ParseStatusCode(acceptedPatterns []string) ([]uint16, error) {
+func ParseStatusCode(acceptedPatterns []string) ([]StatusCodeRange, error) {
 	if len(acceptedPatterns) == 0 {
 		return nil, errors.New("no accepted status codes provided")
 	}
 
-	seen := make(map[uint16]bool)
-	var result []uint16
-	result = result[:0]
+	var ranges []StatusCodeRange
 
 	for _, pattern := range acceptedPatterns {
 		pattern = strings.TrimSpace(pattern)
@@ -50,15 +53,10 @@ func ParseStatusCode(acceptedPatterns []string) ([]uint16, error) {
 			return nil, err
 		}
 
-		for code := from; code <= to; code++ {
-			if !seen[code] {
-				seen[code] = true
-				result = append(result, code)
-			}
-		}
+		ranges = append(ranges, StatusCodeRange{From: from, To: to})
 	}
 
-	return result, nil
+	return ranges, nil
 }
 
 func parsePattern(pattern string) (from, to uint16, err error) {
