@@ -116,9 +116,10 @@ const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
 
   // ---- Update chart when data changes ----
   useEffect(() => {
-    if (!chartRef.current) return;
-
-    chartRef.current.changeData(data.length ? data : []);
+    if (chartRef.current) {
+      chartRef.current.update({ data: [] });
+      chartRef.current.changeData(data.length ? data : []);
+    }
   }, [data]);
 
   return (
@@ -155,10 +156,17 @@ const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
         )}
 
         {!loading && data.length === 0 && (
-          <Empty
-            description="No history data available"
-            style={{ marginTop: 100 }}
-          />
+          <div
+            style={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              zIndex: 1,
+            }}
+          >
+            <Empty description="No history data available" />
+          </div>
         )}
 
         <div ref={containerRef} style={{ height: "100%" }} />
