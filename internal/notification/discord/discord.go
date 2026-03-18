@@ -159,3 +159,21 @@ func addQueryParam(url, key, value string) string {
 	}
 	return url + "?" + key + "=" + value
 }
+
+func SendSystemErrorWebhook(webhookURL, title, errorMessage string) error {
+	embed := discordEmbed{
+		Title:     title,
+		Color:     colorDown,
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Fields: []discordEmbedField{
+			{Name: "Error", Value: "```" + errorMessage + "```", Inline: false},
+		},
+	}
+
+	payload := discordPayload{
+		Username: "Pingopher System",
+		Embeds:   []discordEmbed{embed},
+	}
+
+	return util.SendJSONWebhook(webhookURL, payload)
+}

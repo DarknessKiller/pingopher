@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/DarknessKiller/pingopher/internal/model"
@@ -112,6 +113,12 @@ func (ps *Scheduler) scheduleHost(ctx context.Context, host *model.Host) {
 func (ps *Scheduler) runPingForHost(ctx context.Context, hostID string) {
 	prevStatus, host, histories, err := ps.service.PingHost(ctx, hostID)
 	if err != nil {
+		if strings.Contains(err.Error(), "Exceeded maximum DB size") || strings.Contains(err.Error(), "7500") {
+			if host != nil {
+				ps.notificationService.SendSystemErrorNotification(host, "Database Error", err.Error())
+			}
+		}
+
 		if !(os.IsTimeout(err) || errors.Is(err, gorm.ErrRecordNotFound)) {
 			log.Printf("[%s] ping failed: %v", hostID, err)
 			return

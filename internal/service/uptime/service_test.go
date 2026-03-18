@@ -264,4 +264,49 @@ func TestService_PingHost(t *testing.T) {
 			t.Errorf("expected status code 500, got %d", histories[0].StatusCode)
 		}
 	})
+
+	t.Run("Failure_DBSizeExceeded", func(t *testing.T) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
+		defer ts.Close()
+
+		u, _ := url.Parse(ts.URL)
+		hostStr := u.Hostname()
+		portStr := u.Port()
+		port, _ := strconv.Atoi(portStr)
+
+		hostID := ksuid.New()
+		mockHost := &model.Host{
+			BaseModel:           model.BaseModel{ID: hostID},
+			HostURL:             hostStr,
+			Port:                uint16(port),
+			Protocol:            "http",
+			Status:              model.HostStatusUnknown,
+			AcceptedStatusCodes: []string{"200-299"},
+		}
+
+		mockHostRepo.GetByIDFunc = func(ctx context.Context, id string) (*model.Host, error) {
+			if id == hostID.String() {
+				return mockHost, nil
+			}
+			return nil, errors.New("not found")
+		}
+
+		expectedErr := errors.New("Exceeded maximum DB size")
+		mockHistoryRepo.CreatePingHistoryFunc = func(ctx context.Context, host *model.Host, histories []*model.History) ([]*model.History, error) {
+			return nil, expectedErr
+		}
+
+		_, host, histories, err := svc.PingHost(context.Background(), hostID.String())
+		if err != expectedErr {
+			t.Errorf("expected error %v, got %v", expectedErr, err)
+		}
+		if host == nil {
+			t.Errorf("expected host to be returned even on db size error")
+		}
+		if len(histories) != 0 {
+			t.Errorf("expected histories to be returned even on db size error")
+		}
+	})
 }

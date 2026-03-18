@@ -105,3 +105,20 @@ func (ns *NotificationService) sendOne(n *model.Notification, host *model.Host, 
 		return nil
 	}
 }
+
+func (ns *NotificationService) SendSystemErrorNotification(host *model.Host, title, errorMessage string) {
+	ctx := context.Background()
+	notifications, err := ns.repo.Notification().GetActiveNotificationsForHost(ctx, host.ID.String())
+	if err != nil {
+		log.Printf("[%s] failed to load notifications for system error: %v", host.HostURL, err)
+		return
+	}
+
+	for _, n := range notifications {
+		if n.Type == model.DiscordNotification {
+			if err := discord.SendSystemErrorWebhook(n.DiscordWebhookURL, title, errorMessage); err != nil {
+				log.Printf("[%s] failed to send system error webhook to Discord: %v", host.HostURL, err)
+			}
+		}
+	}
+}

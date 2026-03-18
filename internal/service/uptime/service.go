@@ -131,7 +131,7 @@ func (s *Service) PingHost(ctx context.Context, hostID string) (prevStatus model
 	}
 
 	if histories, err = s.repository.History().CreatePingHistory(ctx, host, histories); err != nil {
-		return "", nil, nil, err
+		return prevStatus, host, histories, err
 	}
 
 	return prevStatus, host, histories, nil
