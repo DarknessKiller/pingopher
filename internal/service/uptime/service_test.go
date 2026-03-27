@@ -171,15 +171,14 @@ func TestService_PingHost(t *testing.T) {
 		defer ts.Close()
 
 		u, _ := url.Parse(ts.URL)
-		hostStr := u.Hostname()
-		port, _ := strconv.ParseUint(u.Port(), 10, 16)
-		portUint := uint16(port)
+		p, _ := strconv.ParseUint(u.Port(), 10, 16)
+		port := uint16(p)
 
 		hostID := ksuid.New()
 		mockHost := &model.Host{
 			BaseModel:           model.BaseModel{ID: hostID},
-			HostURL:             hostStr,
-			Port:                &portUint,
+			HostURL:             u.Hostname(),
+			Port:                &port,
 			Protocol:            "http",
 			Status:              model.HostStatusUnknown,
 			AcceptedStatusCodes: []string{"200-299"},
@@ -222,15 +221,14 @@ func TestService_PingHost(t *testing.T) {
 		defer ts.Close()
 
 		u, _ := url.Parse(ts.URL)
-		hostStr := u.Hostname()
-		port, _ := strconv.ParseUint(u.Port(), 10, 16)
-		portUint := uint16(port)
+		p, _ := strconv.ParseUint(u.Port(), 10, 16)
+		port := uint16(p)
 
 		hostID := ksuid.New()
 		mockHost := &model.Host{
 			BaseModel:           model.BaseModel{ID: hostID},
-			HostURL:             hostStr,
-			Port:                &portUint,
+			HostURL:             u.Hostname(),
+			Port:                &port,
 			Protocol:            "http",
 			Status:              model.HostStatusUnknown,
 			AcceptedStatusCodes: []string{"200-299"},
@@ -272,15 +270,14 @@ func TestService_PingHost(t *testing.T) {
 		defer ts.Close()
 
 		u, _ := url.Parse(ts.URL)
-		hostStr := u.Hostname()
-		port, _ := strconv.ParseUint(u.Port(), 10, 16)
-		portUint := uint16(port)
+		p, _ := strconv.ParseUint(u.Port(), 10, 16)
+		port := uint16(p)
 
 		hostID := ksuid.New()
 		mockHost := &model.Host{
 			BaseModel:           model.BaseModel{ID: hostID},
-			HostURL:             hostStr,
-			Port:                &portUint,
+			HostURL:             u.Hostname(),
+			Port:                &port,
 			Protocol:            "http",
 			Status:              model.HostStatusUnknown,
 			AcceptedStatusCodes: []string{"200-299"},
