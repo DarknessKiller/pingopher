@@ -15,7 +15,7 @@ RUN npm run build \
  && rm -rf node_modules
 
 # Backend Stage
-FROM golang:1.25.4-alpine AS backend-build
+FROM golang:1.26.1-alpine AS backend-build
 WORKDIR /app
 
 COPY go.mod go.sum ./
