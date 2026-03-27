@@ -27,12 +27,10 @@ COPY internal ./internal
 RUN CGO_ENABLED=0 go build -trimpath -ldflags=-s -o /pingopher ./cmd/app
 
 # Application Stage
-FROM alpine:3.23
+FROM gcr.io/distroless/static-debian12:latest
+WORKDIR /app
 
-RUN apk add --no-cache tzdata
+COPY --from=backend-build /pingopher /app/bin/pingopher
+COPY --from=frontend-build /frontend/dist /app/frontend/dist
 
-COPY --from=backend-build /pingopher /usr/local/bin/pingopher
-COPY --from=frontend-build /frontend/dist ./frontend/dist
-
-USER nobody:nobody
-CMD ["pingopher"]
+ENTRYPOINT ["/app/bin/pingopher"]
