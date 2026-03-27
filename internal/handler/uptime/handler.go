@@ -32,6 +32,7 @@ func (h *Handler) CreateHost(ctx *gin.Context) {
 		util.HandleError(ctx, err)
 		return
 	}
+	h.service.PingHost(ctx, host.ID.String())
 	h.scheduler.ScheduleHost(ctx, host)
 
 	ctx.JSON(201, dto.ToHost(host))
@@ -61,6 +62,7 @@ func (h *Handler) UpdateHost(ctx *gin.Context) {
 		util.HandleError(ctx, err)
 		return
 	}
+	h.service.PingHost(ctx, host.ID.String())
 	h.scheduler.ScheduleHost(ctx, host)
 
 	ctx.JSON(200, dto.ToHost(host))
