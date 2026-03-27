@@ -22,7 +22,7 @@ type Host struct {
 	Name                string         `gorm:"type:varchar(255);not null;index:idx_host_name"`
 	Protocol            string         `gorm:"type:varchar(6);not null"`
 	HostURL             string         `gorm:"type:varchar(255);not null;index:uniq_host_url_port,priority:1"`
-	Port                uint16         `gorm:"type:smallint unsigned;not null;index:uniq_host_url_port,priority:2"`
+	Port                *uint16        `gorm:"type:smallint unsigned;not null;index:uniq_host_url_port,priority:2"`
 	TLS                 TLS            `gorm:"type:json"`
 	DNS                 DNSs           `gorm:"type:json"`
 	PingInterval        uint16         `gorm:"type:smallint unsigned;not null"`

@@ -165,8 +165,8 @@ func (s *Service) makeRequestAndBuildHistory(host *model.Host, dns model.DNS) *m
 	}
 
 	hostURL := strings.ToLower(host.Protocol) + "://" + host.HostURL
-	if host.Port != 0 {
-		hostURL += ":" + strconv.Itoa(int(host.Port))
+	if *host.Port != 0 {
+		hostURL += ":" + strconv.Itoa(int(*host.Port))
 	}
 
 	if host.TLS.NoVerify != nil && *host.TLS.NoVerify {
