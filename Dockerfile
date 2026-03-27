@@ -1,32 +1,39 @@
+# Frontend Stage
 FROM node:25-alpine AS frontend-build
 WORKDIR /frontend
+
 COPY frontend/package*.json ./
-RUN npm install
+
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
+
 COPY frontend ./
-RUN npm run build
 
-FROM golang:1.25.4-alpine AS builder
+ENV NODE_OPTIONS=--max-old-space-size=1024
 
+RUN npm run build \
+ && rm -rf node_modules
+
+# Backend Stage
+FROM golang:1.25.4-alpine AS backend-build
 WORKDIR /app
 
 COPY go.mod go.sum ./
 RUN go mod download
 
-COPY . .
+COPY cmd ./cmd
+COPY internal ./internal
 
 COPY --from=frontend-build /frontend/dist ./frontend/dist
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ./cmd/app/pingopher ./cmd/app
+RUN CGO_ENABLED=0 go build -trimpath -ldflags=-s -o /pingopher ./cmd/app
 
-FROM alpine:3.22
+# Application Stage
+FROM alpine:3.23
 
 RUN apk add --no-cache tzdata
 
-WORKDIR /app
-
-COPY --from=builder /app/cmd/app/pingopher /usr/local/bin/pingopher
-COPY --from=builder /app/frontend/dist ./frontend/dist
+COPY --from=backend-build /pingopher /usr/local/bin/pingopher
 
 USER nobody:nobody
-
-ENTRYPOINT ["pingopher"]
+CMD ["pingopher"]
