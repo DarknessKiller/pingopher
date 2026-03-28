@@ -31,7 +31,7 @@ func (r CreateNotificationRequest) ToModel() *model.Notification {
 		return &model.Notification{
 			Name:                 r.Name,
 			Type:                 model.DiscordNotification,
-			Active:               r.Active,
+			Active:               &r.Active,
 			DiscordWebhookURL:    r.DiscordWebhookURL,
 			DiscordPrefixMessage: r.DiscordPrefixMessage,
 			DiscordUsername:      r.DiscordUsername,
@@ -72,7 +72,7 @@ func ToNotification(n *model.Notification) *Notification {
 		HostID:               n.HostID.String(),
 		Name:                 n.Name,
 		Type:                 n.Type,
-		Active:               n.Active,
+		Active:               *n.Active,
 		LastNotifiedAt:       n.LastNotifiedAt.Time,
 		DiscordUsername:      n.DiscordUsername,
 		DiscordWebhookURL:    n.DiscordWebhookURL,
@@ -112,7 +112,7 @@ func (r UpdateNotificationRequest) ToModel() *model.Notification {
 	return &model.Notification{
 		Name:                 r.Name,
 		Type:                 model.NotificationType(r.Type),
-		Active:               r.Active,
+		Active:               &r.Active,
 		DiscordWebhookURL:    r.DiscordWebhookURL,
 		DiscordPrefixMessage: r.DiscordPrefixMessage,
 		DiscordUsername:      r.DiscordUsername,
