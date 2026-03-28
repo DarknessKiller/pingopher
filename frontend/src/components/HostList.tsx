@@ -1,4 +1,4 @@
-  import React, { useEffect, useRef, useState } from "react";
+  import React, { useEffect, useRef, useState, Suspense, lazy } from "react";
   import {
     Table,
     Button,
@@ -22,7 +22,7 @@
   } from "@ant-design/icons";
   import { CreateHostRequest, getHosts, deleteHost, type Host } from "../api";
   import HostForm from "./HostForm";
-  import HostDetail from "./HostDetail";
+  const HostDetail = lazy(() => import("./HostDetail"));
   import NotificationManager from "./NotificationManager";
   import type { ColumnsType } from "antd/es/table";
   import ResponsiveButton from "./ResponsiveButton";
@@ -379,7 +379,11 @@
           centered
           width="90%"
         >
-          {selectedHost ? <HostDetail host={selectedHost} /> : null}
+          {selectedHost ? (
+            <Suspense fallback={<div style={{ textAlign: "center", padding: "50px" }}>Loading Chart...</div>}>
+              <HostDetail host={selectedHost} />
+            </Suspense>
+          ) : null}
         </Modal>
 
         <Modal
