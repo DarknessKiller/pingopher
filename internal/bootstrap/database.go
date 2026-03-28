@@ -9,6 +9,7 @@ import (
 	"github.com/kofj/gorm-driver-d1/gormd1"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func InitiateDatabase(cfg *config.Config) *gorm.DB {
@@ -23,7 +24,7 @@ func InitiateDatabase(cfg *config.Config) *gorm.DB {
 		return nil
 	}
 
-	if cfg.Env == "development" {
+	if cfg.Env != "production" {
 		db = db.Debug()
 	}
 
@@ -57,7 +58,7 @@ func InitiateD1Database(cfg *config.Config) *gorm.DB {
 		cfg.CloudflareD1.AuthToken,
 		cfg.CloudflareD1.DatabaseString)
 
-	gormDB, err := gorm.Open(gormd1.Open(dsn), &gorm.Config{})
+	gormDB, err := gorm.Open(gormd1.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
 		log.Fatal("Failed to initialize GORM with D1:", err)
 	}

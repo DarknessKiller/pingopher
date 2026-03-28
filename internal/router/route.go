@@ -12,6 +12,9 @@ import (
 
 func Router(bs *bootstrap.Bootstrap) *gin.Engine {
 
+	if bs.Config.Env == "production" {
+		gin.SetMode(gin.ReleaseMode)
+	}
 	r := gin.Default()
 	r.NoRoute(func(c *gin.Context) {
 		c.Status(http.StatusOK)

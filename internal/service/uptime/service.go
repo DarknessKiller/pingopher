@@ -138,10 +138,11 @@ func (s *Service) PingHost(ctx context.Context, hostID string) (prevStatus model
 }
 
 func (s *Service) makeRequestAndBuildHistory(host *model.Host, dns model.DNS) *model.History {
-	client := resty.New()
-	if s.config.Env == "development" {
-		client = client.EnableDebug()
-	}
+	userAgent := "Pingopher/Alpha (https://github.com/DarknessKiller/pingopher)"
+	client := resty.New().
+		SetHeader("User-Agent", userAgent).
+		SetDebug(s.config.Env != "production")
+
 	defer client.Close()
 
 	if dns != (model.DNS{Name: "System DNS"}) {
