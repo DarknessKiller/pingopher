@@ -378,6 +378,7 @@
           footer={null}
           centered
           width="90%"
+          destroyOnClose
         >
           {selectedHost ? (
             <Suspense fallback={<div style={{ textAlign: "center", padding: "50px" }}>Loading Chart...</div>}>
@@ -393,6 +394,7 @@
           footer={null}
           centered
           width="90%"
+          destroyOnClose
         >
           {selectedHost ? <NotificationManager host={selectedHost} /> : null}
         </Modal>
