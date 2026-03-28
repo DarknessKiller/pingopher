@@ -35,30 +35,6 @@ func CheckStatusCode(status uint16, acceptedPatterns []string) (bool, error) {
 	return false, nil
 }
 
-func ParseStatusCode(acceptedPatterns []string) ([]StatusCodeRange, error) {
-	if len(acceptedPatterns) == 0 {
-		return nil, errors.New("no accepted status codes provided")
-	}
-
-	var ranges []StatusCodeRange
-
-	for _, pattern := range acceptedPatterns {
-		pattern = strings.TrimSpace(pattern)
-		if pattern == "" {
-			continue
-		}
-
-		from, to, err := parsePattern(pattern)
-		if err != nil {
-			return nil, err
-		}
-
-		ranges = append(ranges, StatusCodeRange{From: from, To: to})
-	}
-
-	return ranges, nil
-}
-
 func parsePattern(pattern string) (from, to uint16, err error) {
 	if len(pattern) == 0 {
 		return 0, 0, errors.New("empty status code pattern")
