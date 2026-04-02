@@ -31,13 +31,15 @@ func New() *Bootstrap {
 		log.Fatalf("failed to load config: %v", err)
 	}
 
+	cache := InitiateRedis(cfg)
+
 	bs.Config = cfg
 	bs.Database = InitiateDatabase(bs.Config)
 	bs.HostRepository = repository.NewBaseRepository[model.Host](bs.Database)
 	bs.HistoryRepository = repository.NewHistoryRepository(bs.Database)
 	bs.NotificationRepository = repository.NewNotificationRepository(bs.Database)
-	bs.UptimeService = uptime.NewService(bs.Config, bs.HostRepository, bs.HistoryRepository)
-	bs.NotificationService = notification.NewService(bs.HostRepository, bs.NotificationRepository)
+	bs.UptimeService = uptime.NewService(bs.Config, bs.HostRepository, bs.HistoryRepository, cache)
+	bs.NotificationService = notification.NewService(bs.HostRepository, bs.NotificationRepository, cache)
 	bs.UptimeScheduler = uptime.NewScheduler(bs.UptimeService, bs.NotificationService)
 	return bs
 }

@@ -17,25 +17,59 @@ import (
 	"resty.dev/v3"
 )
 
+type Cache interface {
+	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error
+	Get(ctx context.Context, key string, dest interface{}) error
+	Delete(ctx context.Context, keys ...string) error
+	InvalidateByPrefix(ctx context.Context, prefix string) error
+}
+
 type Service struct {
 	config     *config.Config
 	repository Repository
+	cache      Cache
 }
 
-func NewService(config *config.Config, hostRepository repository.HostRepository, historyRepository repository.HistoryRepository) *Service {
-	return &Service{config: config, repository: &newRepository{HostRepo: hostRepository, HistoryRepo: historyRepository}}
+func NewService(config *config.Config, hostRepository repository.HostRepository, historyRepository repository.HistoryRepository, cacheClient Cache) *Service {
+	return &Service{config: config, repository: &newRepository{HostRepo: hostRepository, HistoryRepo: historyRepository}, cache: cacheClient}
 }
 
 func (s *Service) CreateHost(ctx context.Context, host *model.Host) error {
-	return s.repository.Host().Create(ctx, host)
+	err := s.repository.Host().Create(ctx, host)
+	if err == nil {
+		s.cache.Delete(ctx, "pingopher_hosts:all")
+	}
+	return err
 }
 
 func (s *Service) GetHostByID(ctx context.Context, hostID string) (*model.Host, error) {
-	return s.repository.Host().GetByID(ctx, hostID)
+	cacheKey := "pingopher_host:" + hostID
+	var host *model.Host
+	if err := s.cache.Get(ctx, cacheKey, &host); err == nil {
+		return host, nil
+	}
+
+	host, err := s.repository.Host().GetByID(ctx, hostID)
+	if err != nil {
+		return nil, err
+	}
+
+	_ = s.cache.Set(ctx, cacheKey, host, 24*time.Hour)
+	return host, err
 }
 
 func (s *Service) GetAllHosts(ctx context.Context) ([]model.Host, error) {
-	return s.repository.Host().GetAll(ctx)
+	cacheKey := "pingopher_hosts:all"
+	var hosts []model.Host
+	if err := s.cache.Get(ctx, cacheKey, &hosts); err == nil {
+		return hosts, nil
+	}
+
+	hosts, err := s.repository.Host().GetAll(ctx)
+	if err == nil {
+		_ = s.cache.Set(ctx, cacheKey, hosts, 24*time.Hour)
+	}
+	return hosts, err
 }
 
 func (s *Service) UpdateHost(ctx context.Context, hostID string, host *model.Host) (*model.Host, error) {
@@ -49,6 +83,7 @@ func (s *Service) UpdateHost(ctx context.Context, hostID string, host *model.Hos
 		return nil, err
 	}
 
+	_ = s.cache.Delete(ctx, "pingopher_hosts:all", "pingopher_host:"+hostID)
 	return host, nil
 }
 
@@ -58,7 +93,11 @@ func (s *Service) DeleteHost(ctx context.Context, hostID string) error {
 		return err
 	}
 
-	return s.repository.Host().Delete(ctx, hostID)
+	err = s.repository.Host().Delete(ctx, hostID)
+	if err == nil {
+		_ = s.cache.Delete(ctx, "pingopher_hosts:all", "pingopher_host:"+hostID)
+	}
+	return err
 }
 
 func (s *Service) GetHistoryByHostID(ctx context.Context, hostID, startAt, endAt string) ([]*model.History, error) {
@@ -79,9 +118,14 @@ func (s *Service) GetHistoryByHostID(ctx context.Context, hostID, startAt, endAt
 }
 
 func (s *Service) PingHost(ctx context.Context, hostID string) (prevStatus model.HostStatus, host *model.Host, histories []*model.History, err error) {
-	host, err = s.repository.Host().GetByID(ctx, hostID)
-	if err != nil {
-		return "", nil, nil, err
+	cacheKey := "pingopher_host:" + hostID
+	if err := s.cache.Get(ctx, cacheKey, &host); err != nil {
+		host, err = s.repository.Host().GetByID(ctx, hostID)
+		if err != nil {
+			return "", nil, nil, err
+		}
+
+		_ = s.cache.Set(ctx, cacheKey, host, 24*time.Hour)
 	}
 
 	var (
@@ -89,9 +133,9 @@ func (s *Service) PingHost(ctx context.Context, hostID string) (prevStatus model
 		mutex sync.Mutex
 	)
 
-	dnsList := host.DNS
-	if len(dnsList) == 0 {
-		dnsList = []model.DNS{{Name: "System DNS"}}
+	dnsList := []model.DNS{{Name: "System DNS"}}
+	if len(host.DNS) > 0 {
+		dnsList = host.DNS
 	}
 
 	pingTime := time.Now()
@@ -100,16 +144,16 @@ func (s *Service) PingHost(ctx context.Context, hostID string) (prevStatus model
 
 	for i, dns := range dnsList {
 		wg.Add(1)
-		go func() {
+		go func(i int, dns model.DNS) {
 			defer wg.Done()
 
-			history := s.makeRequestAndBuildHistory(host, dns)
+			history := s.makeRequestAndBuildHistory(ctx, host, dns)
 			history.PingDateTime = sql.NullTime{Time: pingTime, Valid: true}
 
 			mutex.Lock()
 			histories[i] = history
 			mutex.Unlock()
-		}()
+		}(i, dns)
 	}
 
 	wg.Wait()
@@ -130,14 +174,19 @@ func (s *Service) PingHost(ctx context.Context, hostID string) (prevStatus model
 		host.Status = model.HostStatusUp
 	}
 
-	if histories, err = s.repository.History().CreatePingHistory(ctx, host, histories); err != nil {
+	if prevStatus != host.Status {
+		_ = s.cache.Set(ctx, cacheKey, host, 24*time.Hour)
+		_ = s.cache.Delete(ctx, "pingopher_hosts:all")
+	}
+
+	if histories, err = s.repository.History().CreatePingHistory(ctx, prevStatus, host, histories); err != nil {
 		return prevStatus, host, histories, err
 	}
 
 	return prevStatus, host, histories, nil
 }
 
-func (s *Service) makeRequestAndBuildHistory(host *model.Host, dns model.DNS) *model.History {
+func (s *Service) makeRequestAndBuildHistory(ctx context.Context, host *model.Host, dns model.DNS) *model.History {
 	userAgent := "Pingopher/Alpha (https://github.com/DarknessKiller/pingopher)"
 	client := resty.New().
 		SetHeader("User-Agent", userAgent).
@@ -153,9 +202,8 @@ func (s *Service) makeRequestAndBuildHistory(host *model.Host, dns model.DNS) *m
 
 		dialer := &net.Dialer{
 			Resolver: &net.Resolver{
-				PreferGo: true,
 				Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-					d := net.Dialer{Timeout: 10 * time.Second}
+					d := net.Dialer{Timeout: 500 * time.Millisecond}
 					return d.DialContext(ctx, dns.Protocol, dnsIP)
 				},
 			},
@@ -166,7 +214,7 @@ func (s *Service) makeRequestAndBuildHistory(host *model.Host, dns model.DNS) *m
 	}
 
 	hostURL := strings.ToLower(host.Protocol) + "://" + host.HostURL
-	if *host.Port != 0 {
+	if host.Port != nil && *host.Port != 0 {
 		hostURL += ":" + strconv.Itoa(int(*host.Port))
 	}
 
@@ -175,7 +223,7 @@ func (s *Service) makeRequestAndBuildHistory(host *model.Host, dns model.DNS) *m
 	}
 
 	var errorMsg string
-	resp, err := client.R().Get(hostURL)
+	resp, err := client.R().WithContext(ctx).Get(hostURL)
 	switch err.(type) {
 	case nil:
 		if resp.Err != nil {

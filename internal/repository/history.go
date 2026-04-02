@@ -12,7 +12,7 @@ type HistoryRepository interface {
 	Repository[model.History]
 	GetHistoryByID(ctx context.Context, historyId string) (*model.History, error)
 	GetHistoryByHostID(ctx context.Context, hostID string, startAt, endAt time.Time) ([]*model.History, error)
-	CreatePingHistory(ctx context.Context, host *model.Host, histories []*model.History) ([]*model.History, error)
+	CreatePingHistory(ctx context.Context, previousStatus model.HostStatus, host *model.Host, histories []*model.History) ([]*model.History, error)
 }
 
 type historyRepository struct {
@@ -52,6 +52,7 @@ func (r *historyRepository) GetHistoryByHostID(
 
 func (h *historyRepository) CreatePingHistory(
 	ctx context.Context,
+	previousStatus model.HostStatus,
 	host *model.Host,
 	histories []*model.History,
 ) ([]*model.History, error) {
@@ -61,8 +62,11 @@ func (h *historyRepository) CreatePingHistory(
 			return err
 
 		}
-		if err := tx.Model(host).Updates(host).Error; err != nil {
-			return err
+
+		if previousStatus != host.Status {
+			if err := tx.Model(host).Updates(host).Error; err != nil {
+				return err
+			}
 		}
 
 		return nil

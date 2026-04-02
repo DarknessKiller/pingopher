@@ -1,7 +1,9 @@
 package uptime_handler
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/DarknessKiller/pingopher/internal/dto"
 	"github.com/DarknessKiller/pingopher/internal/service/notification"
@@ -32,8 +34,20 @@ func (h *Handler) CreateHost(ctx *gin.Context) {
 		util.HandleError(ctx, err)
 		return
 	}
-	h.service.PingHost(ctx, host.ID.String())
+
 	h.scheduler.ScheduleHost(ctx, host)
+
+	go func(ctx context.Context, hostID string) {
+		ctx = context.WithoutCancel(ctx)
+
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+
+		_, _, _, err := h.service.PingHost(ctx, hostID)
+		if err != nil {
+		}
+
+	}(ctx.Request.Context(), host.ID.String())
 
 	ctx.JSON(201, dto.ToHost(host))
 }
@@ -62,8 +76,21 @@ func (h *Handler) UpdateHost(ctx *gin.Context) {
 		util.HandleError(ctx, err)
 		return
 	}
-	h.service.PingHost(ctx, host.ID.String())
+
 	h.scheduler.ScheduleHost(ctx, host)
+
+	go func(ctx context.Context, hostID string) {
+		ctx = context.WithoutCancel(ctx)
+
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+
+		_, _, histories, err := h.service.PingHost(ctx, hostID)
+		if err != nil {
+		}
+
+		h.notification.SendNotification(host, histories)
+	}(ctx.Request.Context(), host.ID.String())
 
 	ctx.JSON(200, dto.ToHost(host))
 }

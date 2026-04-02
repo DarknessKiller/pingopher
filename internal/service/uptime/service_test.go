@@ -68,7 +68,7 @@ type MockHistoryRepository struct {
 	UpdateFunc             func(ctx context.Context, id string, history *model.History) error
 	DeleteFunc             func(ctx context.Context, id string) error
 	GetHistoryByIDFunc     func(ctx context.Context, historyId string) (*model.History, error)
-	CreatePingHistoryFunc  func(ctx context.Context, host *model.Host, histories []*model.History) ([]*model.History, error)
+	CreatePingHistoryFunc  func(ctx context.Context, previousStatus model.HostStatus, host *model.Host, histories []*model.History) ([]*model.History, error)
 	GetHistoryByHostIDFunc func(ctx context.Context, hostID string, startAt, endAt time.Time) ([]*model.History, error)
 }
 
@@ -114,9 +114,9 @@ func (m *MockHistoryRepository) GetHistoryByID(ctx context.Context, historyId st
 	return nil, errors.New("mock GetHistoryByIDFunc not implemented")
 }
 
-func (m *MockHistoryRepository) CreatePingHistory(ctx context.Context, host *model.Host, histories []*model.History) ([]*model.History, error) {
+func (m *MockHistoryRepository) CreatePingHistory(ctx context.Context, previousStatus model.HostStatus, host *model.Host, histories []*model.History) ([]*model.History, error) {
 	if m.CreatePingHistoryFunc != nil {
-		return m.CreatePingHistoryFunc(ctx, host, histories)
+		return m.CreatePingHistoryFunc(ctx, previousStatus, host, histories)
 	}
 	return nil, errors.New("mock CreatePingHistoryFunc not implemented")
 }
@@ -128,11 +128,35 @@ func (m *MockHistoryRepository) GetHistoryByHostID(ctx context.Context, hostID s
 	return nil, errors.New("mock GetHistoryByHostIDFunc not implemented")
 }
 
+// MockRedis
+type MockRedis struct {
+	GetFunc    func(ctx context.Context, key string, dest interface{}) error
+	SetFunc    func(ctx context.Context, key string, value interface{}, expiration time.Duration) error
+	DeleteFunc func(ctx context.Context, keys ...string) error
+}
+
+func (m *MockRedis) Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
+	return errors.New("redis inactive")
+}
+
+func (m *MockRedis) Get(ctx context.Context, key string, dest interface{}) error {
+	return errors.New("redis inactive")
+}
+
+func (m *MockRedis) Delete(ctx context.Context, keys ...string) error {
+	return errors.New("redis inactive")
+}
+
+func (m *MockRedis) InvalidateByPrefix(ctx context.Context, prefix string) error {
+	return errors.New("redis inactive")
+}
+
 func TestService_CreateHost(t *testing.T) {
 	mockHostRepo := &MockHostRepository{}
 	mockHistoryRepo := &MockHistoryRepository{}
+	mockRedis := &MockRedis{}
 	cfg := &config.Config{}
-	svc := uptime.NewService(cfg, mockHostRepo, mockHistoryRepo)
+	svc := uptime.NewService(cfg, mockHostRepo, mockHistoryRepo, mockRedis)
 
 	t.Run("Success", func(t *testing.T) {
 		mockHostRepo.CreateFunc = func(ctx context.Context, host *model.Host) error {
@@ -161,8 +185,9 @@ func TestService_CreateHost(t *testing.T) {
 func TestService_PingHost(t *testing.T) {
 	mockHostRepo := &MockHostRepository{}
 	mockHistoryRepo := &MockHistoryRepository{}
+	mockRedis := &MockRedis{}
 	cfg := &config.Config{Env: "test"}
-	svc := uptime.NewService(cfg, mockHostRepo, mockHistoryRepo)
+	svc := uptime.NewService(cfg, mockHostRepo, mockHistoryRepo, mockRedis)
 
 	t.Run("Success", func(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -191,7 +216,7 @@ func TestService_PingHost(t *testing.T) {
 			return nil, errors.New("not found")
 		}
 
-		mockHistoryRepo.CreatePingHistoryFunc = func(ctx context.Context, host *model.Host, histories []*model.History) ([]*model.History, error) {
+		mockHistoryRepo.CreatePingHistoryFunc = func(ctx context.Context, previousStatus model.HostStatus, host *model.Host, histories []*model.History) ([]*model.History, error) {
 			return histories, nil
 		}
 
@@ -241,7 +266,7 @@ func TestService_PingHost(t *testing.T) {
 			return nil, errors.New("not found")
 		}
 
-		mockHistoryRepo.CreatePingHistoryFunc = func(ctx context.Context, host *model.Host, histories []*model.History) ([]*model.History, error) {
+		mockHistoryRepo.CreatePingHistoryFunc = func(ctx context.Context, previousStatus model.HostStatus, host *model.Host, histories []*model.History) ([]*model.History, error) {
 			return histories, nil
 		}
 
@@ -291,7 +316,7 @@ func TestService_PingHost(t *testing.T) {
 		}
 
 		expectedErr := errors.New("Exceeded maximum DB size")
-		mockHistoryRepo.CreatePingHistoryFunc = func(ctx context.Context, host *model.Host, histories []*model.History) ([]*model.History, error) {
+		mockHistoryRepo.CreatePingHistoryFunc = func(ctx context.Context, previousStatus model.HostStatus, host *model.Host, histories []*model.History) ([]*model.History, error) {
 			return nil, expectedErr
 		}
 

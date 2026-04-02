@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/DarknessKiller/pingopher/internal/model"
 	"github.com/DarknessKiller/pingopher/internal/service/notification"
@@ -99,6 +100,9 @@ func (ps *Scheduler) scheduleHost(ctx context.Context, host *model.Host) {
 	spec := fmt.Sprintf("@every %ds", interval)
 
 	jobID, err := ps.cron.AddFunc(spec, func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
 		ps.runPingForHost(ctx, host.ID.String())
 	})
 	if err != nil {

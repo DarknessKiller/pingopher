@@ -1,11 +1,30 @@
 services:
   pingopher:
     container_name: pingopher
-    build:
-      context: .
-      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - redis
     ports:
       - "8080:8080"
     env_file:
       - .env
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+  redis:
+    container_name: redis
+    image: docker.io/valkey/valkey:9-alpine
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - valkey-data:/data
+
+volumes:
+  valkey-data:
+    driver: local
