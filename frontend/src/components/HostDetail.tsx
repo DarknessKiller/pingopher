@@ -42,57 +42,47 @@ const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
     setDnsColors({});
   }, [host]);
 
-  // ---- Async polling effect ----
-  useEffect(() => {
-    if (!host) return;
+useEffect(() => {
+  if (!host) return;
 
-    const controller = new AbortController();
-    let refreshTimer: NodeJS.Timeout | null = null;
+  const controller = new AbortController();
 
-    const fetchHistoryAsync = async () => {
-      setLoading(true);
-      const { startAt, endAt } = computeRange(range);
+  const fetchData = async () => {
+    setLoading(true);
+    const { startAt, endAt } = computeRange(range);
 
-      try {
-        const response = await getHostHistory(host.id, startAt, endAt, {
-          signal: controller.signal,
-        });
+    try {
+      const response = await getHostHistory(host.id, startAt, endAt, {
+        signal: controller.signal,
+      });
 
-        if (controller.signal.aborted) return;
+      if (controller.signal.aborted) return;
 
-        const results: Result[] = response.data?.results ?? [];
-        
-        // Delegate parsing logic to utility module
-        const processed = processHistoryResults(results, host);
+      const results: Result[] = response.data?.results ?? [];
+      
+      // Delegate parsing logic to utility module
+      const processed = processHistoryResults(results, host);
 
-        setUptimePercent(processed.uptimePercent);
-        setDnsColors(processed.dnsColors);
-        setDowntimes(processed.downtimes);
-        setData(processed.parsed);
-      } catch (err) {
-        if (!controller.signal.aborted) {
-          console.error(err);
-          message.error((err as Error).message);
-        }
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    };
-
-    const runPolling = async () => {
-      await fetchHistoryAsync();
+      setUptimePercent(processed.uptimePercent);
+      setDnsColors(processed.dnsColors);
+      setData(processed.parsed);
+      setDowntimes(processed.downtimes);
+    } catch (err) {
       if (!controller.signal.aborted) {
-        refreshTimer = setTimeout(runPolling, 10_000);
+        console.error(err);
+        message.error((err as Error).message);
       }
-    };
+    } finally {
+      if (!controller.signal.aborted) setLoading(false);
+    }
+  };
 
-    runPolling();
+  fetchData();
 
-    return () => {
-      controller.abort();
-      if (refreshTimer) clearTimeout(refreshTimer);
-    };
-  }, [host, range]);
+  return () => {
+    controller.abort();
+  };
+}, [host, range]);
 
   // ---- Initialize Chart Once ----
   useEffect(() => {
