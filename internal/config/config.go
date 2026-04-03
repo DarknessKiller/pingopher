@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -26,6 +27,9 @@ type Config struct {
 	// Databases
 	SQLitePath   string
 	CloudflareD1 CloudflareD1Config
+
+	// Scheduler
+	MaxRetryInterval int
 }
 
 func Load() (*Config, error) {
@@ -34,6 +38,15 @@ func Load() (*Config, error) {
 	if env == "" {
 		if err := godotenv.Load(".env"); err != nil {
 			panic("Could not load .env file")
+		}
+	}
+
+	maxRetryInterval := 900
+	if os.Getenv("PINGOPHER_MAX_RETRY_INTERVAL") != "" {
+		var err error
+		maxRetryInterval, err = strconv.Atoi(os.Getenv("PINGOPHER_MAX_RETRY_INTERVAL"))
+		if err != nil {
+			return nil, err
 		}
 	}
 
@@ -51,6 +64,7 @@ func Load() (*Config, error) {
 			AuthToken:      os.Getenv("PINGOPHER_CF_D1_AUTH_TOKEN"),
 			DatabaseString: os.Getenv("PINGOPHER_CF_D1_DATABASE_STRING"),
 		},
+		MaxRetryInterval: maxRetryInterval,
 	}
 
 	return cfg, nil
