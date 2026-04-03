@@ -27,7 +27,7 @@
   import type { ColumnsType } from "antd/es/table";
   import ResponsiveButton from "./ResponsiveButton";
 
-  const POLL_INTERVAL = 10000;
+  const POLL_INTERVAL = 60000;
 
   const HostList: React.FC = () => {
     const { modal } = App.useApp()
