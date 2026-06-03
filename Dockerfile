@@ -1,5 +1,5 @@
 # Frontend Stage
-FROM node:25-alpine AS frontend-build
+FROM node:26-alpine AS frontend-build
 WORKDIR /frontend
 
 COPY frontend/package*.json ./
@@ -15,7 +15,7 @@ RUN npm run build \
  && rm -rf node_modules
 
 # Backend Stage
-FROM golang:1.26.1-alpine AS backend-build
+FROM golang:1.26-alpine AS backend-build
 WORKDIR /app
 
 COPY go.mod go.sum ./
@@ -24,7 +24,7 @@ RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
 
-RUN CGO_ENABLED=0 go build -trimpath -ldflags=-s -o /pingopher ./cmd/app
+RUN go build -trimpath -ldflags=-s -o /pingopher ./cmd/app
 
 # Application Stage
 FROM gcr.io/distroless/static-debian12:latest
