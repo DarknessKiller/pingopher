@@ -85,7 +85,6 @@ export const processHistoryResults = (results: Result[], host: Host): ProcessedH
   }
 
   const rawDowntimes: DowntimeEvent[] = [];
-  let upCount = 0;
 
   for (const [dnsName, dnsResults] of Object.entries(resultsByDns)) {
     let currentDowntime: DowntimeEvent | null = null;
@@ -108,7 +107,6 @@ export const processHistoryResults = (results: Result[], host: Host): ProcessedH
           };
         }
       } else {
-        upCount++;
         if (currentDowntime) {
           currentDowntime.end = time;
           currentDowntime.formattedEnd = formattedTime;
@@ -166,7 +164,31 @@ export const processHistoryResults = (results: Result[], host: Host): ProcessedH
       newDowntimes.push(...merged);
   }
 
-  const uptimePercent = results.length > 0 ? (upCount / results.length) * 100 : 100;
+  let uptimePercent = 100;
+  if (results.length > 0) {
+    let totalDowntimeMs = 0;
+    let totalMonitoredMs = 0;
+    const now = new Date().getTime();
+
+    for (const dnsResults of Object.values(resultsByDns)) {
+      if (dnsResults.length > 0) {
+        const firstPingMs = new Date(dnsResults[0].timestamp).getTime();
+        totalMonitoredMs += Math.max(0, now - firstPingMs);
+      }
+    }
+
+    for (const dt of newDowntimes) {
+      const startMs = dt.start.getTime();
+      const endMs = dt.end ? dt.end.getTime() : now;
+      totalDowntimeMs += Math.max(0, endMs - startMs);
+    }
+
+    if (totalMonitoredMs > 0) {
+      const actualUptimeMs = Math.max(0, totalMonitoredMs - totalDowntimeMs);
+      uptimePercent = Math.min(100, (actualUptimeMs / totalMonitoredMs) * 100);
+    }
+  }
+
   newDowntimes.sort((a, b) => b.start.getTime() - a.start.getTime());
 
   const parsed: ParsedHistory[] = results.map((item) => {

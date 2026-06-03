@@ -42,47 +42,47 @@ const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
     setDnsColors({});
   }, [host]);
 
-useEffect(() => {
-  if (!host) return;
+  useEffect(() => {
+    if (!host) return;
 
-  const controller = new AbortController();
+    const controller = new AbortController();
 
-  const fetchData = async () => {
-    setLoading(true);
-    const { startAt, endAt } = computeRange(range);
+    const fetchData = async () => {
+      setLoading(true);
+      const { startAt, endAt } = computeRange(range);
 
-    try {
-      const response = await getHostHistory(host.id, startAt, endAt, {
-        signal: controller.signal,
-      });
+      try {
+        const response = await getHostHistory(host.id, startAt, endAt, {
+          signal: controller.signal,
+        });
 
-      if (controller.signal.aborted) return;
+        if (controller.signal.aborted) return;
 
-      const results: Result[] = response.data?.results ?? [];
-      
-      // Delegate parsing logic to utility module
-      const processed = processHistoryResults(results, host);
+        const results: Result[] = response.data?.results ?? [];
 
-      setUptimePercent(processed.uptimePercent);
-      setDnsColors(processed.dnsColors);
-      setData(processed.parsed);
-      setDowntimes(processed.downtimes);
-    } catch (err) {
-      if (!controller.signal.aborted) {
-        console.error(err);
-        message.error((err as Error).message);
+        // Delegate parsing logic to utility module
+        const processed = processHistoryResults(results, host);
+
+        setUptimePercent(processed.uptimePercent);
+        setDnsColors(processed.dnsColors);
+        setData(processed.parsed);
+        setDowntimes(processed.downtimes);
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          console.error(err);
+          message.error((err as Error).message);
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
       }
-    } finally {
-      if (!controller.signal.aborted) setLoading(false);
-    }
-  };
+    };
 
-  fetchData();
+    fetchData();
 
-  return () => {
-    controller.abort();
-  };
-}, [host, range]);
+    return () => {
+      controller.abort();
+    };
+  }, [host, range]);
 
   // ---- Initialize Chart Once ----
   useEffect(() => {
