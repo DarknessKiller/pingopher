@@ -43,10 +43,12 @@ func (h *Handler) CreateHost(ctx *gin.Context) {
 		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
-		_, _, _, err := h.service.PingHost(ctx, hostID)
+		_, _, histories, err := h.service.PingHost(ctx, hostID)
 		if err != nil {
+			return
 		}
 
+		h.notification.SendNotification(host, histories)
 	}(ctx.Request.Context(), host.ID.String())
 
 	ctx.JSON(201, dto.ToHost(host))
