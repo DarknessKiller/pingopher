@@ -166,27 +166,20 @@ export const processHistoryResults = (results: Result[], host: Host): ProcessedH
 
   let uptimePercent = 100;
   if (results.length > 0) {
-    let totalDowntimeMs = 0;
-    let totalMonitoredMs = 0;
-    const now = new Date().getTime();
-
-    for (const dnsResults of Object.values(resultsByDns)) {
-      if (dnsResults.length > 0) {
-        const firstPingMs = new Date(dnsResults[0].timestamp).getTime();
-        totalMonitoredMs += Math.max(0, now - firstPingMs);
+    const rounds = new Map<string, boolean>();
+    for (const r of results) {
+      const key = r.timestamp;
+      if (!rounds.has(key)) rounds.set(key, true);
+      if (!!r.errorMsg || (r.statusCode !== 0 && !checkStatusCode(r.statusCode, host.acceptedStatusCodes))) {
+        rounds.set(key, false);
       }
     }
 
-    for (const dt of newDowntimes) {
-      const startMs = dt.start.getTime();
-      const endMs = dt.end ? dt.end.getTime() : now;
-      totalDowntimeMs += Math.max(0, endMs - startMs);
+    let failedRounds = 0;
+    for (const ok of rounds.values()) {
+      if (!ok) failedRounds++;
     }
-
-    if (totalMonitoredMs > 0) {
-      const actualUptimeMs = Math.max(0, totalMonitoredMs - totalDowntimeMs);
-      uptimePercent = Math.min(100, (actualUptimeMs / totalMonitoredMs) * 100);
-    }
+    uptimePercent = Math.round(((rounds.size - failedRounds) / rounds.size) * 10000) / 100;
   }
 
   newDowntimes.sort((a, b) => b.start.getTime() - a.start.getTime());
