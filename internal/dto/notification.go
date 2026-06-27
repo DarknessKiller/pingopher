@@ -66,6 +66,13 @@ type Notification struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
+func maskWebhookURL(url string) string {
+	if len(url) < 20 {
+		return "***"
+	}
+	return url[:8] + "***" + url[len(url)-8:]
+}
+
 func ToNotification(n *model.Notification) *Notification {
 	return &Notification{
 		ID:                   n.ID.String(),
@@ -75,7 +82,7 @@ func ToNotification(n *model.Notification) *Notification {
 		Active:               *n.Active,
 		LastNotifiedAt:       n.LastNotifiedAt.Time,
 		DiscordUsername:      n.DiscordUsername,
-		DiscordWebhookURL:    n.DiscordWebhookURL,
+		DiscordWebhookURL:    maskWebhookURL(n.DiscordWebhookURL),
 		DiscordPrefixMessage: n.DiscordPrefixMessage,
 		DiscordDisableURL:    n.DiscordDisableURL,
 		DiscordChannelType:   n.DiscordChannelType,
