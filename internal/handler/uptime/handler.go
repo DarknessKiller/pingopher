@@ -43,12 +43,12 @@ func (h *Handler) CreateHost(ctx *gin.Context) {
 		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
-		_, _, histories, err := h.service.PingHost(ctx, hostID)
+		_, pingedHost, histories, err := h.service.PingHost(ctx, hostID)
 		if err != nil {
 			return
 		}
 
-		h.notification.SendNotification(host, histories)
+		h.notification.SendNotification(pingedHost, histories)
 	}(ctx.Request.Context(), host.ID.String())
 
 	ctx.JSON(201, dto.ToHost(host))
@@ -87,12 +87,12 @@ func (h *Handler) UpdateHost(ctx *gin.Context) {
 		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 
-		_, _, histories, err := h.service.PingHost(ctx, hostID)
+		_, pingedHost, histories, err := h.service.PingHost(ctx, hostID)
 		if err != nil {
 			return
 		}
 
-		h.notification.SendNotification(host, histories)
+		h.notification.SendNotification(pingedHost, histories)
 	}(ctx.Request.Context(), host.ID.String())
 
 	ctx.JSON(200, dto.ToHost(host))
