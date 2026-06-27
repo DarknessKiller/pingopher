@@ -89,6 +89,7 @@ func (h *Handler) UpdateHost(ctx *gin.Context) {
 
 		_, _, histories, err := h.service.PingHost(ctx, hostID)
 		if err != nil {
+			return
 		}
 
 		h.notification.SendNotification(host, histories)

@@ -3,6 +3,7 @@ package util
 import (
 	"errors"
 	"io"
+	"log"
 	"net/http"
 
 	"github.com/DarknessKiller/pingopher/internal/dto"
@@ -17,6 +18,7 @@ func HandleError(ctx *gin.Context, err error) {
 		returnError(http.StatusBadRequest, err.Error())
 	case errors.Is(err, io.EOF):
 	default:
-		returnError(http.StatusInternalServerError, err.Error())
+		log.Printf("Internal error: %v", err)
+		returnError(http.StatusInternalServerError, "internal server error")
 	}
 }
