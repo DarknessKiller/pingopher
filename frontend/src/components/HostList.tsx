@@ -44,7 +44,7 @@
 
     const [selectedHost, setSelectedHost] = useState<Host | undefined>();
 
-    const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const fetchControllerRef = useRef<AbortController | null>(null);
 
     // --------------------------
