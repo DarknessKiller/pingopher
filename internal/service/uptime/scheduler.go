@@ -54,19 +54,18 @@ func (ps *Scheduler) getStateLocked(hostID string) *hostState {
 func (ps *Scheduler) Start() {
 	ctx := context.Background()
 
-	var (
-		hosts []model.Host
-		err   error
-	)
-
-	for {
+	var hosts []model.Host
+	for attempt := range 10 {
+		var err error
 		hosts, err = ps.service.GetAllHosts(ctx)
-		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Fatal(err)
-		} else if err != nil {
-			continue
+		if err == nil {
+			break
 		}
-		break
+		log.Printf("Loading hosts failed (attempt %d/10): %v", attempt+1, err)
+		time.Sleep(3 * time.Second)
+	}
+	if hosts == nil {
+		log.Fatal("Failed to load hosts after 10 attempts")
 	}
 
 	for i := range hosts {
