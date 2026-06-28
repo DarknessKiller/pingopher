@@ -32,6 +32,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Lowercase repo
         id: repo
         run: echo "LOWERCASE=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
@@ -41,6 +47,7 @@ jobs:
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: |
             ghcr.io/${{ steps.repo.outputs.LOWERCASE }}:${{ steps.version.outputs.VERSION }}
             ghcr.io/${{ steps.repo.outputs.LOWERCASE }}:latest
