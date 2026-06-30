@@ -1,4 +1,9 @@
+.gitignore
 .git
+.github
+.vscode
+.codegraph
+opencode.jsonc
 .env*
-pingopher.db
+*.db
 cmd/app/pingopher

@@ -7,7 +7,7 @@ import (
 	"github.com/DarknessKiller/pingopher/internal/config"
 	"github.com/DarknessKiller/pingopher/internal/model"
 	"github.com/kofj/gorm-driver-d1/gormd1"
-	"gorm.io/driver/sqlite"
+	"github.com/libtnb/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -47,7 +47,7 @@ func InitiateSQLiteDatabase(cfg *config.Config) *gorm.DB {
 		log.Fatal("Failed to connect to SQLite:", err)
 	}
 
-	log.Println("SQLite connected! File: ", cfg.SQLitePath)
+	log.Println("SQLite connected! File:", cfg.SQLitePath)
 	return db
 }
 
@@ -63,6 +63,6 @@ func InitiateD1Database(cfg *config.Config) *gorm.DB {
 		log.Fatal("Failed to initialize GORM with D1:", err)
 	}
 
-	log.Println("D1 connected! Database: ", cfg.CloudflareD1.DatabaseString)
+	log.Println("D1 connected! Database:", cfg.CloudflareD1.DatabaseString)
 	return gormDB
 }

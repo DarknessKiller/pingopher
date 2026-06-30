@@ -1,36 +1,33 @@
 # Frontend Stage
-FROM node:25-alpine AS frontend-build
+FROM node:26-alpine AS frontend-build
 WORKDIR /frontend
-
 COPY frontend/package*.json ./
-
 RUN --mount=type=cache,target=/root/.npm \
     npm ci
-
 COPY frontend ./
-
-ENV NODE_OPTIONS=--max-old-space-size=1024
-
-RUN npm run build \
- && rm -rf node_modules
+RUN npm run build
 
 # Backend Stage
-FROM golang:1.26.1-alpine AS backend-build
+FROM golang:1.26-alpine AS backend-build
 WORKDIR /app
-
 COPY go.mod go.sum ./
 RUN go mod download
-
 COPY cmd ./cmd
 COPY internal ./internal
-
-RUN CGO_ENABLED=0 go build -trimpath -ldflags=-s -o /pingopher ./cmd/app
+ARG TARGETOS TARGETARCH
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o pingopher ./cmd/app
 
 # Application Stage
-FROM gcr.io/distroless/static-debian12:latest
+FROM scratch
 WORKDIR /app
 
-COPY --from=backend-build /pingopher /app/bin/pingopher
+COPY --from=backend-build /app/pingopher /app/bin/pingopher
 COPY --from=frontend-build /frontend/dist /app/frontend/dist
 
+ENV ENV=production
+ENV PINGOPHER_HOST=0.0.0.0
+ENV PINGOPHER_PORT=4112
+ENV PINGOPHER_MAX_RETRY_INTERVAL=900
+
+EXPOSE ${PINGOPHER_PORT}
 ENTRYPOINT ["/app/bin/pingopher"]
