@@ -23,10 +23,7 @@ type CreateNotificationRequest struct {
 
 func (r CreateNotificationRequest) ToModel() *model.Notification {
 
-	lower := func(t string) string {
-		return string(strings.ToLower(string(t)))
-	}
-	switch lower(r.Type) {
+	switch strings.ToLower(r.Type) {
 	case string(model.DiscordNotification):
 		return &model.Notification{
 			Name:                 r.Name,

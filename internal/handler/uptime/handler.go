@@ -36,20 +36,7 @@ func (h *Handler) CreateHost(ctx *gin.Context) {
 	}
 
 	h.scheduler.ScheduleHost(ctx, host)
-
-	go func(ctx context.Context, hostID string) {
-		ctx = context.WithoutCancel(ctx)
-
-		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		defer cancel()
-
-		_, pingedHost, histories, err := h.service.PingHost(ctx, hostID)
-		if err != nil {
-			return
-		}
-
-		h.notification.SendNotification(pingedHost, histories)
-	}(ctx.Request.Context(), host.ID.String())
+	h.pingHostAndNotify(ctx.Request.Context(), host.ID.String())
 
 	ctx.JSON(201, dto.ToHost(host))
 }
@@ -80,20 +67,7 @@ func (h *Handler) UpdateHost(ctx *gin.Context) {
 	}
 
 	h.scheduler.ScheduleHost(ctx, host)
-
-	go func(ctx context.Context, hostID string) {
-		ctx = context.WithoutCancel(ctx)
-
-		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		defer cancel()
-
-		_, pingedHost, histories, err := h.service.PingHost(ctx, hostID)
-		if err != nil {
-			return
-		}
-
-		h.notification.SendNotification(pingedHost, histories)
-	}(ctx.Request.Context(), host.ID.String())
+	h.pingHostAndNotify(ctx.Request.Context(), host.ID.String())
 
 	ctx.JSON(200, dto.ToHost(host))
 }
@@ -153,4 +127,20 @@ func (h *Handler) GetHistory(ctx *gin.Context) {
 	}
 
 	ctx.JSON(200, dto.ToHistories(histories))
+}
+
+func (h *Handler) pingHostAndNotify(ctx context.Context, hostID string) {
+	go func() {
+		ctx = context.WithoutCancel(ctx)
+
+		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+
+		_, pingedHost, histories, err := h.service.PingHost(ctx, hostID)
+		if err != nil {
+			return
+		}
+
+		h.notification.SendNotification(pingedHost, histories)
+	}()
 }

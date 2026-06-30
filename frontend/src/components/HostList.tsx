@@ -1,4 +1,4 @@
-  import React, { useEffect, useRef, useState, Suspense, lazy } from "react";
+  import React, { useEffect, useRef, useState, useMemo, Suspense, lazy } from "react";
   import {
     Table,
     Button,
@@ -32,8 +32,9 @@
   const HostList: React.FC = () => {
     const { modal } = App.useApp()
     const [hosts, setHosts] = useState<Host[]>([]);
-    const [sortedHosts, setSortedHosts] = useState<Host[]>([]);
     const [loading, setLoading] = useState(false);
+    const [sortField, setSortField] = useState<keyof Host | null>(null);
+    const [sortOrder, setSortOrder] = useState<"ascend" | "descend" | null>(null);
 
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [editingHost, setEditingHost] = useState<Host | undefined>(undefined);
@@ -64,10 +65,12 @@
       return <Tag color={colorMap[status]}>{status.toUpperCase()}</Tag>;
     };
 
-    const handleSort = (field: keyof Host, order: "ascend" | "descend") => {
-      const sorted = [...hosts].sort((a, b) => {
+    const sortedHosts = useMemo(() => {
+      if (!sortField || !sortOrder) return hosts;
+
+      return [...hosts].sort((a, b) => {
         let compare = 0;
-        switch (field) {
+        switch (sortField) {
           case "name":
             compare = a.name.localeCompare(b.name);
             break;
@@ -81,10 +84,9 @@
             compare = getHostUrl(a).localeCompare(getHostUrl(b));
             break;
         }
-        return order === "ascend" ? compare : -compare;
+        return sortOrder === "ascend" ? compare : -compare;
       });
-      setSortedHosts(sorted);
-    };
+    }, [hosts, sortField, sortOrder]);
 
     // --------------------------
     // Fetch hosts
@@ -99,7 +101,6 @@
         const response = await getHosts({ signal: controller.signal });
         if (!controller.signal.aborted) {
           setHosts(response.data.hosts);
-          setSortedHosts(response.data.hosts);
         }
       } catch (err) {
         if (!controller.signal.aborted) message.error((err as Error).message);
@@ -121,11 +122,12 @@
         }
       };
 
-      fetchHosts(true).then(() => {
+      (async () => {
+        await fetchHosts(true);
         if (!controller.signal.aborted) {
           pollTimerRef.current = setTimeout(runPolling, POLL_INTERVAL);
         }
-      });
+      })();
 
       return () => {
         controller.abort();
@@ -263,10 +265,9 @@
             loading={loading}
             scroll={{ x: "max-content" }}
             onChange={(_pagination, _filters, sorter) => {
-              if (!Array.isArray(sorter) && sorter.order && sorter.field) {
-                handleSort(sorter.field as keyof Host, sorter.order);
-              } else {
-                setSortedHosts(hosts);
+              if (!Array.isArray(sorter)) {
+                setSortField(sorter.order ? (sorter.field as keyof Host) : null);
+                setSortOrder(sorter.order || null);
               }
             }}
           />
@@ -280,8 +281,14 @@
               <Select
                 placeholder="Sort by"
                 onChange={(value) => {
-                  const [field, order] = (value as string).split("-");
-                  handleSort(field as keyof Host, order as "ascend" | "descend");
+                  if (!value) {
+                    setSortField(null);
+                    setSortOrder(null);
+                  } else {
+                    const [field, order] = (value as string).split("-");
+                    setSortField(field as keyof Host);
+                    setSortOrder(order as "ascend" | "descend");
+                  }
                 }}
                 style={{ width: 200 }}
                 allowClear
@@ -303,7 +310,7 @@
           </Row>
 
           <Row gutter={[16, 16]}>
-            {(sortedHosts.length > 0 ? sortedHosts : hosts).map((host) => (
+            {sortedHosts.map((host) => (
               <Col xs={24} sm={12} key={host.id}>
                 <Card
                   title={host.name}

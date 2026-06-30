@@ -29,33 +29,13 @@ type tlsRequest struct {
 }
 
 func (r CreateHostRequest) ToModel() *model.Host {
-	var dns []model.DNS
-	if r.DNS != nil {
-		dns = make([]model.DNS, len(r.DNS))
-		for i, d := range r.DNS {
-			dns[i] = model.DNS{
-				Name:     d.Name,
-				IP:       d.IP,
-				Port:     d.Port,
-				Protocol: d.Protocol,
-			}
-		}
-	}
-
-	var tls model.TLS
-	if r.TLS.NoVerify != nil {
-		tls = model.TLS{
-			NoVerify: r.TLS.NoVerify,
-		}
-	}
-
 	return &model.Host{
 		Name:                r.Name,
 		Protocol:            r.Protocol,
 		HostURL:             r.HostURL,
 		Port:                &r.Port,
-		TLS:                 tls,
-		DNS:                 dns,
+		TLS:                 mapTLS(r.TLS),
+		DNS:                 mapDNS(r.DNS),
 		PingInterval:        r.PingInterval,
 		FailThreshold:       r.FailThreshold,
 		AcceptedStatusCodes: r.AcceptedStatusCodes,
@@ -107,6 +87,29 @@ func ToAllHosts(hosts []model.Host) Hosts {
 	return Hosts{Hosts: res}
 }
 
+func mapDNS(dns []dnsRequest) []model.DNS {
+	if dns == nil {
+		return nil
+	}
+	result := make([]model.DNS, len(dns))
+	for i, d := range dns {
+		result[i] = model.DNS{
+			Name:     d.Name,
+			IP:       d.IP,
+			Port:     d.Port,
+			Protocol: d.Protocol,
+		}
+	}
+	return result
+}
+
+func mapTLS(tls tlsRequest) model.TLS {
+	if tls.NoVerify == nil {
+		return model.TLS{}
+	}
+	return model.TLS{NoVerify: tls.NoVerify}
+}
+
 type UpdateHostRequest struct {
 	Name                string       `json:"name" binding:"omitempty"`
 	Protocol            string       `json:"protocol" binding:"omitempty,oneof=http https"`
@@ -120,33 +123,13 @@ type UpdateHostRequest struct {
 }
 
 func (r UpdateHostRequest) ToModel() *model.Host {
-	var dns []model.DNS
-	if r.DNS != nil {
-		dns = make([]model.DNS, len(r.DNS))
-		for i, d := range r.DNS {
-			dns[i] = model.DNS{
-				Name:     d.Name,
-				IP:       d.IP,
-				Port:     d.Port,
-				Protocol: d.Protocol,
-			}
-		}
-	}
-
-	var tls model.TLS
-	if r.TLS.NoVerify != nil {
-		tls = model.TLS{
-			NoVerify: r.TLS.NoVerify,
-		}
-	}
-
 	return &model.Host{
 		Name:                r.Name,
 		Protocol:            r.Protocol,
 		HostURL:             r.HostURL,
 		Port:                &r.Port,
-		TLS:                 tls,
-		DNS:                 dns,
+		TLS:                 mapTLS(r.TLS),
+		DNS:                 mapDNS(r.DNS),
 		PingInterval:        r.PingInterval,
 		FailThreshold:       r.FailThreshold,
 		AcceptedStatusCodes: r.AcceptedStatusCodes,
