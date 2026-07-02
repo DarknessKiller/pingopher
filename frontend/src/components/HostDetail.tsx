@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Line } from "@antv/g2plot";
+import { Line, type Datum } from "@antv/g2plot";
 import { getHostHistory, type Host, type Result } from "../api";
 import { Spin, Empty, message, Select, Row, Col, Statistic, Card, Timeline, Tag } from "antd";
 import { CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined } from "@ant-design/icons";
@@ -21,6 +21,14 @@ const TIME_RANGES = [
   { label: "Last 30 days", value: "30d" },
 ] as const;
 
+const overlayStyle: React.CSSProperties = {
+  position: "absolute",
+  top: "50%",
+  left: "50%",
+  transform: "translate(-50%, -50%)",
+  zIndex: 1,
+};
+
 const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<Line | null>(null);
@@ -32,15 +40,6 @@ const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
   const [dnsColors, setDnsColors] = useState<Record<string, string>>({});
 
   const [range, setRange] = useState<(typeof TIME_RANGES)[number]["value"]>("30m");
-
-  // Reset time range when host changes
-  useEffect(() => {
-    setRange("30m");
-    setData([]);
-    setDowntimes([]);
-    setUptimePercent(100);
-    setDnsColors({});
-  }, [host]);
 
   useEffect(() => {
     if (!host) return;
@@ -95,8 +94,8 @@ const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
       seriesField: "dns",
       yAxis: { label: { formatter: (v) => `${v} ms` } },
       tooltip: {
-        formatter: (datum: any) => {
-          return { name: datum.dns, value: datum.latencyValue !== null ? `${datum.latencyValue} ms` : '-' };
+        formatter: (datum: Datum) => {
+          return { name: String(datum.dns), value: datum.latencyValue !== null ? `${datum.latencyValue} ms` : '-' };
         },
       },
       legend: { position: "top" },
@@ -116,9 +115,9 @@ const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
   useEffect(() => {
     if (chartRef.current) {
       const annotations = downtimes.map((dt) => ({
-        type: 'region',
-        start: [dt.formattedStart, 'min'],
-        end: [dt.formattedEnd || (data.length > 0 ? data[data.length - 1].time : dt.formattedStart), 'max'],
+        type: 'region' as const,
+        start: [dt.formattedStart, 'min'] as [string, string],
+        end: [dt.formattedEnd || (data.length > 0 ? data[data.length - 1].time : dt.formattedStart), 'max'] as [string, string],
         style: {
           fill: '#ff4d4f',
           fillOpacity: 0.15,
@@ -126,9 +125,9 @@ const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
       }));
 
       chartRef.current.update({
-        data: data.length ? data : [],
-        annotations: annotations as any,
-        color: (datum: any) => dnsColors[datum.dns] || '#5B8FF9',
+        data,
+        annotations,
+        color: (datum: Datum) => dnsColors[datum.dns] || '#5B8FF9',
       });
     }
   }, [data, downtimes, dnsColors]);
@@ -178,29 +177,13 @@ const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
 
       <div style={{ position: "relative", height: 400, marginBottom: 24 }}>
         {loading && (
-          <div
-            style={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              zIndex: 1,
-            }}
-          >
+          <div style={overlayStyle}>
             <Spin size="large" />
           </div>
         )}
 
         {!loading && data.length === 0 && (
-          <div
-            style={{
-              position: "absolute",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              zIndex: 1,
-            }}
-          >
+          <div style={overlayStyle}>
             <Empty description="No history data available" />
           </div>
         )}

@@ -6,24 +6,18 @@ import (
 	"log"
 	"time"
 
+	"github.com/DarknessKiller/pingopher/internal/cache"
 	"github.com/DarknessKiller/pingopher/internal/model"
 	"github.com/DarknessKiller/pingopher/internal/notification/discord"
 	"github.com/DarknessKiller/pingopher/internal/repository"
 )
 
-type Cache interface {
-	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error
-	Get(ctx context.Context, key string, dest interface{}) error
-	Delete(ctx context.Context, keys ...string) error
-	InvalidateByPrefix(ctx context.Context, prefix string) error
-}
-
 type NotificationService struct {
 	repository Repository
-	cache      Cache
+	cache      cache.Cache
 }
 
-func NewService(hostRepository *repository.BaseRepository[model.Host], historyRepo repository.NotificationRepository, cacheClient Cache) *NotificationService {
+func NewService(hostRepository *repository.BaseRepository[model.Host], historyRepo repository.NotificationRepository, cacheClient cache.Cache) *NotificationService {
 	return &NotificationService{repository: &newRepository{HostRepo: hostRepository, NotificationRepo: historyRepo}, cache: cacheClient}
 }
 

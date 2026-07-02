@@ -37,7 +37,7 @@ func ToHistories(histories []*model.History) Histories {
 		results[i] = Result{
 			DNS:        dnsName,
 			StatusCode: history.StatusCode,
-			Latency:    formatLatency(history.Latency),
+			Latency:    fmt.Sprintf("%d ms", history.Latency),
 			Timestamp:  history.CreatedAt,
 			ErrorMsg:   history.ErrorMessage,
 		}
@@ -47,8 +47,4 @@ func ToHistories(histories []*model.History) Histories {
 		HostURL: histories[0].Host.HostURL,
 		Results: results,
 	}
-}
-
-func formatLatency(latency uint16) string {
-	return fmt.Sprintf("%d ms", latency)
 }

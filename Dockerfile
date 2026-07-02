@@ -18,7 +18,7 @@ ARG TARGETOS TARGETARCH
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o pingopher ./cmd/app
 
 # Application Stage
-FROM gcr.io/distroless/static-debian12:latest
+FROM gcr.io/distroless/static-debian13:latest
 WORKDIR /app
 
 COPY --from=backend-build /app/pingopher /app/bin/pingopher

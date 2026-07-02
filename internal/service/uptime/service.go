@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/DarknessKiller/pingopher/internal/cache"
 	"github.com/DarknessKiller/pingopher/internal/config"
 	"github.com/DarknessKiller/pingopher/internal/model"
 	"github.com/DarknessKiller/pingopher/internal/repository"
@@ -17,20 +18,13 @@ import (
 	"resty.dev/v3"
 )
 
-type Cache interface {
-	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error
-	Get(ctx context.Context, key string, dest interface{}) error
-	Delete(ctx context.Context, keys ...string) error
-	InvalidateByPrefix(ctx context.Context, prefix string) error
-}
-
 type Service struct {
 	config     *config.Config
 	repository Repository
-	cache      Cache
+	cache      cache.Cache
 }
 
-func NewService(config *config.Config, hostRepository repository.HostRepository, historyRepository repository.HistoryRepository, cacheClient Cache) *Service {
+func NewService(config *config.Config, hostRepository repository.HostRepository, historyRepository repository.HistoryRepository, cacheClient cache.Cache) *Service {
 	return &Service{config: config, repository: &newRepository{HostRepo: hostRepository, HistoryRepo: historyRepository}, cache: cacheClient}
 }
 

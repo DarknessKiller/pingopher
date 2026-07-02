@@ -1,32 +1,19 @@
+const OFFSETS: Record<string, (d: Date) => void> = {
+  "30m": (d) => d.setMinutes(d.getMinutes() - 30),
+  "1h": (d) => d.setHours(d.getHours() - 1),
+  "12h": (d) => d.setHours(d.getHours() - 12),
+  "24h": (d) => d.setHours(d.getHours() - 24),
+  "7d": (d) => d.setDate(d.getDate() - 7),
+  "30d": (d) => d.setDate(d.getDate() - 30),
+};
+
 export function computeRange(range: string) {
   const start = new Date();
-  const now = new Date();
-
-  switch (range) {
-    case "30m":
-      start.setMinutes(now.getMinutes() - 30);
-      break;
-    case "1h":
-      start.setHours(now.getHours() - 1);
-      break;
-    case "12h":
-      start.setHours(now.getHours() - 12);
-      break;
-    case "24h":
-      start.setHours(now.getHours() - 24);
-      break;
-    case "7d":
-      start.setDate(now.getDate() - 7);
-      break;
-    case "30d":
-      start.setDate(now.getDate() - 30);
-      break;
-    default:
-      start.setTime(0);
+  const apply = OFFSETS[range];
+  if (apply) {
+    apply(start);
+  } else {
+    start.setTime(0);
   }
-
-  return {
-    startAt: start.toISOString(),
-    endAt: now.toISOString(),
-  };
+  return { startAt: start.toISOString(), endAt: new Date().toISOString() };
 }
