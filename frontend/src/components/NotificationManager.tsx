@@ -44,13 +44,12 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ host }) => {
   const [form] = Form.useForm<CreateNotificationRequest>();
   const controllerRef = useRef<AbortController | null>(null);
 
-  // Fetch notifications
-  const fetchNotifications = useCallback(async () => {
+  const fetchNotifications = useCallback(async ({ showLoading = true } = {}) => {
     if (controllerRef.current) controllerRef.current.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
 
-    setLoading(true);
+    if (showLoading) setLoading(true);
     try {
       const response = await getNotifications(host.id, {
         signal: controller.signal,
@@ -59,17 +58,20 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ host }) => {
         setNotifications(response.data || []);
       }
     } catch (error) {
-      if ((error as any).name !== "CanceledError") {
+      if (!controller.signal.aborted) {
         message.error((error as Error).message);
       }
     } finally {
-      if (!controller.signal.aborted) setLoading(false);
+      if (!controller.signal.aborted && showLoading) setLoading(false);
     }
   }, [host.id]);
 
   useEffect(() => {
-    fetchNotifications();
-    return () => controllerRef.current?.abort();
+    const load = async () => { await fetchNotifications({ showLoading: true }); };
+    load();
+    return () => {
+      if (controllerRef.current) controllerRef.current.abort();
+    };
   }, [fetchNotifications]);
 
   const handleCreate = () => {

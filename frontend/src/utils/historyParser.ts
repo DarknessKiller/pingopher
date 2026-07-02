@@ -33,8 +33,8 @@ export const formatDuration = (ms: number) => {
 
 export const checkStatusCode = (status: number, patterns: string[] | undefined): boolean => {
   if (!patterns || patterns.length === 0) return true;
-  for (let p of patterns) {
-    p = p.trim().toLowerCase();
+  for (const raw of patterns) {
+    const p = raw.trim().toLowerCase();
     if (!p) continue;
     if (p === status.toString()) return true;
     if (p.includes("-")) {
@@ -53,6 +53,9 @@ export const checkStatusCode = (status: number, patterns: string[] | undefined):
   }
   return false;
 };
+
+const isResultDown = (item: Result, acceptedStatusCodes: string[] | undefined): boolean =>
+  !!item.errorMsg || (item.statusCode !== 0 && !checkStatusCode(item.statusCode, acceptedStatusCodes));
 
 export interface ProcessedHistoryData {
   dnsColors: Record<string, string>;
@@ -76,6 +79,12 @@ export const processHistoryResults = (results: Result[], host: Host): ProcessedH
     colorMap[n] = COLOR_PALETTE[i % COLOR_PALETTE.length];
   });
 
+  // Precompute isDown per result once to avoid redundant isResultDown calls
+  const downMap = new Map<Result, boolean>();
+  for (const r of results) {
+    downMap.set(r, isResultDown(r, host.acceptedStatusCodes));
+  }
+
   // Group by DNS
   const resultsByDns: Record<string, Result[]> = {};
   for (const r of results) {
@@ -90,7 +99,7 @@ export const processHistoryResults = (results: Result[], host: Host): ProcessedH
     let currentDowntime: DowntimeEvent | null = null;
     
     for (const item of dnsResults) {
-      const isDown = !!item.errorMsg || (item.statusCode !== 0 && !checkStatusCode(item.statusCode, host.acceptedStatusCodes));
+      const isDown = downMap.get(item)!;
       const time = new Date(item.timestamp);
       const formattedTime = time.toLocaleString();
 
@@ -119,62 +128,40 @@ export const processHistoryResults = (results: Result[], host: Host): ProcessedH
     }
 
     if (currentDowntime) {
-      const now = new Date();
-      const durationMs = now.getTime() - currentDowntime.start.getTime();
+      const durationMs = Date.now() - currentDowntime.start.getTime();
       currentDowntime.durationString = `${formatDuration(durationMs)} (Ongoing)`;
       rawDowntimes.push(currentDowntime);
     }
   }
 
-  // Merge
-  const newDowntimes: DowntimeEvent[] = [];
+  // Merge adjacent downtimes within threshold per DNS
   const mergeThresholdMs = (host.pingInterval || 60) * 1000 * 1.5;
+  const newDowntimes: DowntimeEvent[] = [];
 
-  const rawByDns: Record<string, DowntimeEvent[]> = {};
+  rawDowntimes.sort((a, b) => a.dns.localeCompare(b.dns) || a.start.getTime() - b.start.getTime());
+
   for (const dt of rawDowntimes) {
-    if (!rawByDns[dt.dns]) rawByDns[dt.dns] = [];
-    rawByDns[dt.dns].push(dt);
-  }
-
-  for (const [, dts] of Object.entries(rawByDns)) {
-      const merged: DowntimeEvent[] = [];
-      for (const dt of dts) {
-        if (merged.length === 0) {
-          merged.push(dt);
-        } else {
-          const prev = merged[merged.length - 1];
-          if (prev.end) {
-            const gapMs = dt.start.getTime() - prev.end.getTime();
-            if (gapMs <= mergeThresholdMs) {
-              prev.end = dt.end;
-              prev.formattedEnd = dt.formattedEnd;
-              if (dt.end) {
-                const durMs = dt.end.getTime() - prev.start.getTime();
-                prev.durationString = formatDuration(durMs);
-              } else {
-                const durMs = new Date().getTime() - prev.start.getTime();
-                prev.durationString = `${formatDuration(durMs)} (Ongoing)`;
-              }
-              continue;
-            }
-          }
-          merged.push(dt);
-        }
+    const last = newDowntimes[newDowntimes.length - 1];
+    if (last && last.dns === dt.dns && last.end) {
+      const gapMs = dt.start.getTime() - last.end.getTime();
+      if (gapMs <= mergeThresholdMs) {
+        last.end = dt.end;
+        last.formattedEnd = dt.formattedEnd;
+        const endMs = dt.end?.getTime() ?? Date.now();
+        last.durationString = formatDuration(endMs - last.start.getTime()) + (dt.end ? "" : " (Ongoing)");
+        continue;
       }
-      newDowntimes.push(...merged);
+    }
+    newDowntimes.push(dt);
   }
 
   let uptimePercent = 100;
   if (results.length > 0) {
     const rounds = new Map<string, boolean>();
     for (const r of results) {
-      const key = r.timestamp;
-      if (!rounds.has(key)) rounds.set(key, true);
-      if (!!r.errorMsg || (r.statusCode !== 0 && !checkStatusCode(r.statusCode, host.acceptedStatusCodes))) {
-        rounds.set(key, false);
-      }
+      const isFailed = downMap.get(r)!;
+      rounds.set(r.timestamp, (rounds.get(r.timestamp) ?? true) && !isFailed);
     }
-
     let failedRounds = 0;
     for (const ok of rounds.values()) {
       if (!ok) failedRounds++;
@@ -184,14 +171,11 @@ export const processHistoryResults = (results: Result[], host: Host): ProcessedH
 
   newDowntimes.sort((a, b) => b.start.getTime() - a.start.getTime());
 
-  const parsed: ParsedHistory[] = results.map((item) => {
-    const isDown = !!item.errorMsg || (item.statusCode !== 0 && !checkStatusCode(item.statusCode, host.acceptedStatusCodes));
-    return {
-      latencyValue: isDown ? null : (parseInt(item.latency.replace(" ms", ""), 10) || 0),
-      time: new Date(item.timestamp).toLocaleString(),
-      dns: item.dns || "System DNS",
-    };
-  });
+  const parsed: ParsedHistory[] = results.map((item) => ({
+    latencyValue: downMap.get(item)! ? null : (parseInt(item.latency.replace(" ms", ""), 10) || 0),
+    time: new Date(item.timestamp).toLocaleString(),
+    dns: item.dns || "System DNS",
+  }));
   parsed.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
 
   return {

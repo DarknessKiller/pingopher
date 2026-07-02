@@ -27,13 +27,53 @@
   import type { ColumnsType } from "antd/es/table";
   import ResponsiveButton from "./ResponsiveButton";
 
+  interface HostActionsProps {
+    host: Host;
+    size?: "small" | "middle" | "large";
+    onNotifications: (host: Host) => void;
+    onDetail: (host: Host) => void;
+    onEdit: (host: Host) => void;
+    onDelete: (host: Host) => void;
+  }
+
+  const HostActions: React.FC<HostActionsProps> = ({ host, size, onNotifications, onDetail, onEdit, onDelete }) => (
+    <Space size="middle">
+      <Button icon={<BellOutlined />} size={size} onClick={() => onNotifications(host)} />
+      <Button icon={<HistoryOutlined />} size={size} onClick={() => onDetail(host)} />
+      <Button icon={<EditOutlined />} size={size} onClick={() => onEdit(host)} />
+      <Button danger icon={<DeleteOutlined />} size={size} onClick={() => onDelete(host)} />
+    </Space>
+  );
+
   const POLL_INTERVAL = 60000;
+
+  const getHostUrl = (host: Host) => {
+    const portPart = host.port && host.port !== 0 ? `:${host.port}` : "";
+    return `${host.protocol}://${host.hostUrl}${portPart}`;
+  };
+
+  const renderStatusTag = (status: Host["status"]) => {
+    const colorMap: Record<Host["status"], string> = {
+      up: "green",
+      down: "red",
+      unknown: "gold",
+    };
+    return <Tag color={colorMap[status]}>{status.toUpperCase()}</Tag>;
+  };
+
+  const comparators: Record<string, (a: Host, b: Host) => number> = {
+    name: (a, b) => a.name.localeCompare(b.name),
+    status: (a, b) => a.status.localeCompare(b.status),
+    pingInterval: (a, b) => a.pingInterval - b.pingInterval,
+    hostUrl: (a, b) => getHostUrl(a).localeCompare(getHostUrl(b)),
+  };
 
   const HostList: React.FC = () => {
     const { modal } = App.useApp()
     const [hosts, setHosts] = useState<Host[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [sortField, setSortField] = useState<keyof Host | null>(null);
+    const [loading, setLoading] = useState(true);
+    type SortField = keyof Host | "url";
+    const [sortField, setSortField] = useState<SortField | null>(null);
     const [sortOrder, setSortOrder] = useState<"ascend" | "descend" | null>(null);
 
     const [isModalVisible, setIsModalVisible] = useState(false);
@@ -49,47 +89,19 @@
     const fetchControllerRef = useRef<AbortController | null>(null);
 
     // --------------------------
-    // Helpers
+    // Sorting
     // --------------------------
-    const getHostUrl = (host: Host) => {
-      const portPart = host.port && host.port !== 0 ? `:${host.port}` : "";
-      return `${host.protocol}://${host.hostUrl}${portPart}`;
-    };
-
-    const renderStatusTag = (status: Host["status"]) => {
-      const colorMap: Record<Host["status"], string> = {
-        up: "green",
-        down: "red",
-        unknown: "gold",
-      };
-      return <Tag color={colorMap[status]}>{status.toUpperCase()}</Tag>;
-    };
-
     const sortedHosts = useMemo(() => {
       if (!sortField || !sortOrder) return hosts;
-
-      return [...hosts].sort((a, b) => {
-        let compare = 0;
-        switch (sortField) {
-          case "name":
-            compare = a.name.localeCompare(b.name);
-            break;
-          case "status":
-            compare = a.status.localeCompare(b.status);
-            break;
-          case "pingInterval":
-            compare = a.pingInterval - b.pingInterval;
-            break;
-          case "hostUrl":
-            compare = getHostUrl(a).localeCompare(getHostUrl(b));
-            break;
-        }
-        return sortOrder === "ascend" ? compare : -compare;
-      });
+      const field = sortField === "url" ? "hostUrl" : sortField;
+      const cmp = comparators[field];
+      if (!cmp) return hosts;
+      const dir = sortOrder === "ascend" ? 1 : -1;
+      return [...hosts].sort((a, b) => dir * cmp(a, b));
     }, [hosts, sortField, sortOrder]);
 
     // --------------------------
-    // Fetch hosts
+    // Fetch hosts (used by handlers and polling)
     // --------------------------
     const fetchHosts = async (showLoading = true) => {
       if (fetchControllerRef.current) fetchControllerRef.current.abort();
@@ -177,6 +189,11 @@
       });
     };
 
+    const openNotifications = (host: Host) => {
+      setSelectedHost(host);
+      setNotificationVisible(true);
+    };
+
     // --------------------------
     // Table columns
     // --------------------------
@@ -185,50 +202,38 @@
         title: "Name",
         dataIndex: "name",
         key: "name",
-        sorter: (a, b) => a.name.localeCompare(b.name),
+        sorter: comparators.name,
       },
       {
         title: "URL",
         key: "url",
         render: (_, record) => getHostUrl(record),
-        sorter: (a, b) => getHostUrl(a).localeCompare(getHostUrl(b)),
+        sorter: comparators.hostUrl,
       },
       {
         title: "Status",
         dataIndex: "status",
         render: renderStatusTag,
-        sorter: (a, b) => a.status.localeCompare(b.status),
+        sorter: comparators.status,
       },
       {
         title: "Interval",
         dataIndex: "pingInterval",
         render: (v: number) => `${v}s`,
-        sorter: (a, b) => a.pingInterval - b.pingInterval,
+        sorter: comparators.pingInterval,
       },
       {
         title: "Actions",
         key: "actions",
         align: "right",
         render: (_, record) => (
-          <Space size="middle">
-            <Button
-              icon={<BellOutlined />}
-              onClick={() => {
-                setSelectedHost(record);
-                setNotificationVisible(true);
-              }}
-            />
-            <Button
-              icon={<HistoryOutlined />}
-              onClick={() => handleShowDetail(record)}
-            />
-            <Button icon={<EditOutlined />} onClick={() => handleEdit(record)} />
-            <Button
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => showDeleteConfirm(record)}
-            />
-          </Space>
+          <HostActions
+            host={record}
+            onNotifications={openNotifications}
+            onDetail={handleShowDetail}
+            onEdit={handleEdit}
+            onDelete={showDeleteConfirm}
+          />
         ),
       },
     ];
@@ -315,32 +320,14 @@
                 <Card
                   title={host.name}
                   extra={
-                    <Space size="small">
-                      <Button
-                        icon={<BellOutlined />}
-                        size="small"
-                        onClick={() => {
-                          setSelectedHost(host);
-                          setNotificationVisible(true);
-                        }}
-                      />
-                      <Button
-                        icon={<HistoryOutlined />}
-                        size="small"
-                        onClick={() => handleShowDetail(host)}
-                      />
-                      <Button
-                        icon={<EditOutlined />}
-                        size="small"
-                        onClick={() => handleEdit(host)}
-                      />
-                      <Button
-                        danger
-                        icon={<DeleteOutlined />}
-                        size="small"
-                        onClick={() => showDeleteConfirm(host)}
-                      />
-                    </Space>
+                    <HostActions
+                      host={host}
+                      size="small"
+                      onNotifications={openNotifications}
+                      onDetail={handleShowDetail}
+                      onEdit={handleEdit}
+                      onDelete={showDeleteConfirm}
+                    />
                   }
                 >
                   <p>
@@ -389,7 +376,7 @@
         >
           {selectedHost ? (
             <Suspense fallback={<div style={{ textAlign: "center", padding: "50px" }}>Loading Chart...</div>}>
-              <HostDetail host={selectedHost} />
+              <HostDetail key={selectedHost.id} host={selectedHost} />
             </Suspense>
           ) : null}
         </Modal>
@@ -403,7 +390,7 @@
           width="90%"
           destroyOnClose
         >
-          {selectedHost ? <NotificationManager host={selectedHost} /> : null}
+          {selectedHost ? <NotificationManager key={selectedHost.id} host={selectedHost} /> : null}
         </Modal>
 
         {/* Responsive CSS */}

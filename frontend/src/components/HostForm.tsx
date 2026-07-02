@@ -47,7 +47,7 @@ const HostForm = forwardRef<FormInstance<CreateHostRequest>, HostFormProps>(
         form.resetFields();
         form.setFieldsValue(DEFAULT_VALUES);
       }
-    }, [initialValues]);
+    }, [initialValues, form]);
 
     const onFinish = async (values: CreateHostRequest) => {
       setLoading(true);
