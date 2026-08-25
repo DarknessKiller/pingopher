@@ -1,305 +1,301 @@
-import { useEffect, useState, forwardRef, useImperativeHandle } from "react";
-import {
-  Form,
-  FormInstance,
-  Input,
-  InputNumber,
-  Select,
-  Button,
-  message,
-  Row,
-  Col,
-  Collapse,
-  Checkbox,
-} from "antd";
-import {
-  createHost,
-  updateHost,
-  type Host,
-  type CreateHostRequest,
-} from "../api";
+import React, { useEffect, useState } from "react";
+import { createHost, updateHost, type Host, type CreateHostRequest } from "../api";
+import { useToast } from "./Toast";
+import { PlusIcon, CloseIcon } from "./icons";
 
 interface HostFormProps {
   initialValues?: Host;
   onSuccess: () => void;
 }
 
-const DEFAULT_VALUES: Partial<CreateHostRequest> = {
+const DEFAULT_VALUES: CreateHostRequest = {
+  name: "",
   protocol: "https",
+  hostUrl: "",
+  port: 0,
   pingInterval: 60,
   failThreshold: 3,
   acceptedStatusCodes: ["200-299"],
   tls: { no_verify: false },
+  dns: [],
 };
 
-const HostForm = forwardRef<FormInstance<CreateHostRequest>, HostFormProps>(
-  ({ initialValues, onSuccess }, ref) => {
-    const [form] = Form.useForm<CreateHostRequest>();
-    const [loading, setLoading] = useState(false);
+const PRESET_STATUS_CODES = [
+  { label: "200 OK", value: "200" },
+  { label: "200–299", value: "200-299" },
+  { label: "2xx", value: "2xx" },
+  { label: "301 Redirect", value: "301" },
+  { label: "4xx", value: "4xx" },
+  { label: "5xx", value: "5xx" },
+];
 
-    useImperativeHandle(ref, () => form);
+interface DnsEntry {
+  name: string;
+  ip: string;
+  port: number;
+  protocol: string;
+}
 
-    // Sync form values when initialValues change
-    useEffect(() => {
+const emptyDns: DnsEntry = { name: "", ip: "", port: 53, protocol: "udp" };
+
+function initForm(h?: Host): CreateHostRequest {
+  if (!h) return { ...DEFAULT_VALUES, dns: [] };
+  return {
+    name: h.name,
+    protocol: h.protocol,
+    hostUrl: h.hostUrl,
+    port: h.port,
+    pingInterval: h.pingInterval,
+    failThreshold: h.failThreshold,
+    acceptedStatusCodes: [...h.acceptedStatusCodes],
+    tls: { ...h.tls },
+    dns: (h.dns ?? []).map((d) => ({ ...d })),
+  };
+}
+
+const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
+  const toast = useToast();
+  const [form, setForm] = useState<CreateHostRequest>(() => initForm(initialValues));
+  const [loading, setLoading] = useState(false);
+  const [codeInput, setCodeInput] = useState("");
+
+  useEffect(() => {
+    setForm(initForm(initialValues));
+  }, [initialValues]);
+
+  const set = <K extends keyof CreateHostRequest>(key: K, val: CreateHostRequest[K]) =>
+    setForm((prev) => ({ ...prev, [key]: val }));
+
+  const addCode = (code: string) => {
+    const trimmed = code.trim();
+    if (trimmed && !form.acceptedStatusCodes.includes(trimmed)) {
+      set("acceptedStatusCodes", [...form.acceptedStatusCodes, trimmed]);
+    }
+  };
+
+  const removeCode = (code: string) => {
+    set("acceptedStatusCodes", form.acceptedStatusCodes.filter((c) => c !== code));
+  };
+
+  const handleCodeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addCode(codeInput);
+      setCodeInput("");
+    }
+    if (e.key === "Backspace" && !codeInput && form.acceptedStatusCodes.length > 0) {
+      removeCode(form.acceptedStatusCodes[form.acceptedStatusCodes.length - 1]);
+    }
+  };
+
+  const addDns = () => set("dns", [...(form.dns ?? []), { ...emptyDns }]);
+
+  const removeDns = (idx: number) =>
+    set("dns", (form.dns ?? []).filter((_, i) => i !== idx));
+
+  const updateDns = (idx: number, field: keyof DnsEntry, value: string | number) => {
+    const dns = [...(form.dns ?? [])];
+    dns[idx] = { ...dns[idx], [field]: value };
+    set("dns", dns);
+  };
+
+  const onFinish = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name || !form.hostUrl) {
+      toast.error("Name and Host URL are required");
+      return;
+    }
+    setLoading(true);
+    try {
       if (initialValues) {
-        form.setFieldsValue({ ...DEFAULT_VALUES, ...initialValues });
+        await updateHost(initialValues.id, form);
+        toast.success("Host updated");
       } else {
-        form.resetFields();
-        form.setFieldsValue(DEFAULT_VALUES);
+        await createHost(form);
+        toast.success("Host created");
       }
-    }, [initialValues, form]);
+      onSuccess();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const onFinish = async (values: CreateHostRequest) => {
-      setLoading(true);
-      try {
-        if (initialValues) {
-          await updateHost(initialValues.id, values);
-          message.success("Host updated successfully");
-        } else {
-          await createHost(values);
-          message.success("Host created successfully");
-        }
-        onSuccess();
-      } catch (err) {
-        message.error((err as Error).message);
-      } finally {
-        setLoading(false);
-      }
-    };
+  return (
+    <form onSubmit={onFinish}>
+      <div className="form-grid form-grid-name-protocol mb-md">
+        <div className="form-group">
+          <label className="form-label">Name</label>
+          <input
+            className="form-input"
+            placeholder="My Server"
+            required
+            value={form.name}
+            onChange={(e) => set("name", e.target.value)}
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Protocol</label>
+          <select className="form-select" value={form.protocol} onChange={(e) => set("protocol", e.target.value)}>
+            <option value="http">HTTP</option>
+            <option value="https">HTTPS</option>
+          </select>
+        </div>
+      </div>
 
-    return (
-      <Form<CreateHostRequest>
-        form={form}
-        layout="vertical"
-        onFinish={onFinish}
-        initialValues={DEFAULT_VALUES}
-      >
-        {/* Row 1 */}
-        <Row gutter={16}>
-          <Col span={16}>
-            <Form.Item
-              name="name"
-              label="Name"
-              rules={[{ required: true, message: "Please enter host name" }]}
-            >
-              <Input placeholder="My Server" />
-            </Form.Item>
-          </Col>
+      <div className="form-grid form-grid-2 mb-md">
+        <div className="form-group">
+          <label className="form-label">Host URL / IP</label>
+          <input
+            className="form-input"
+            placeholder="example.com"
+            required
+            value={form.hostUrl}
+            onChange={(e) => set("hostUrl", e.target.value)}
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Port</label>
+          <input
+            className="form-input"
+            type="number"
+            min={0}
+            max={65535}
+            value={form.port || ""}
+            onChange={(e) => set("port", parseInt(e.target.value) || 0)}
+          />
+        </div>
+      </div>
 
-          <Col span={8}>
-            <Form.Item
-              name="protocol"
-              label="Protocol"
-              rules={[{ required: true, message: "Please select protocol" }]}
-            >
-              <Select
-                options={[
-                  { label: "HTTP", value: "http" },
-                  { label: "HTTPS", value: "https" },
-                ]}
+      <div className="form-grid form-grid-3 mb-lg">
+        <div className="form-group">
+          <label className="form-label">Ping Interval (s)</label>
+          <input
+            className="form-input"
+            type="number"
+            min={1}
+            required
+            value={form.pingInterval}
+            onChange={(e) => set("pingInterval", parseInt(e.target.value) || 60)}
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Fail Threshold</label>
+          <input
+            className="form-input"
+            type="number"
+            min={1}
+            required
+            value={form.failThreshold}
+            onChange={(e) => set("failThreshold", parseInt(e.target.value) || 3)}
+          />
+        </div>
+      </div>
+
+      {/* DNS List */}
+      <div className="mb-lg">
+        <label className="form-label">DNS Servers</label>
+        {(form.dns ?? []).map((entry, idx) => (
+          <div key={idx} className="dns-entry">
+            <div className="dns-entry-fields">
+              <input
+                className="form-input"
+                placeholder="DNS Name"
+                required
+                value={entry.name}
+                onChange={(e) => updateDns(idx, "name", e.target.value)}
               />
-            </Form.Item>
-          </Col>
-        </Row>
+              <input
+                className="form-input"
+                placeholder="IP Address"
+                required
+                value={entry.ip}
+                onChange={(e) => updateDns(idx, "ip", e.target.value)}
+              />
+              <select
+                className="form-select"
+                value={entry.protocol}
+                onChange={(e) => updateDns(idx, "protocol", e.target.value)}
+              >
+                <option value="udp">UDP</option>
+                <option value="tcp">TCP</option>
+              </select>
+              <input
+                className="form-input"
+                type="number"
+                min={1}
+                placeholder="Port"
+                required
+                value={entry.port}
+                onChange={(e) => updateDns(idx, "port", parseInt(e.target.value) || 53)}
+              />
+            </div>
+            <button type="button" className="btn btn-ghost btn-icon btn-sm btn-remove" onClick={() => removeDns(idx)}>
+              <CloseIcon size={16} />
+            </button>
+          </div>
+        ))}
+        <button type="button" className="btn btn-ghost w-full" onClick={addDns} style={{ borderStyle: "dashed" }}>
+          <PlusIcon size={16} /> Add DNS Server
+        </button>
+      </div>
 
-        {/* Row 2 */}
-        <Row gutter={16}>
-          <Col span={16}>
-            <Form.Item
-              name="hostUrl"
-              label="Host URL/IP"
-              rules={[
-                { required: true, message: "Please enter host URL or IP" },
-              ]}
-            >
-              <Input placeholder="example.com" />
-            </Form.Item>
-          </Col>
+      {/* Advanced */}
+      <details className="mb-lg">
+        <summary>Advanced</summary>
+        <div className="details-body">
+          <div className="form-group">
+            <label style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={form.tls.no_verify}
+                onChange={(e) => set("tls", { no_verify: e.target.checked })}
+              />
+              Ignore TLS/SSL errors for HTTPS websites
+            </label>
+          </div>
 
-          <Col span={8}>
-            <Form.Item name="port" label="Port">
-              <InputNumber min={0} max={65535} style={{ width: "100%" }} />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        {/* Row 3 */}
-        <Row gutter={16}>
-          <Col span={12}>
-            <Form.Item
-              name="pingInterval"
-              label="Ping Interval"
-              rules={[
-                { required: true, message: "Please enter ping interval" },
-              ]}
-            >
-              <InputNumber min={1} style={{ width: "100%" }} />
-            </Form.Item>
-          </Col>
-
-          <Col span={12}>
-            <Form.Item
-              name="failThreshold"
-              label="Fail Threshold"
-              rules={[
-                { required: true, message: "Please enter fail threshold" },
-              ]}
-            >
-              <InputNumber min={1} style={{ width: "100%" }} />
-            </Form.Item>
-          </Col>
-        </Row>
-
-        {/* DNS List */}
-        <Form.List name="dns">
-          {(fields, { add, remove }) => (
-            <>
-              {fields.map(({ key, name, ...restField }) => (
-                <div
-                  key={key}
-                  style={{
-                    display: "flex",
-                    gap: 8,
-                    marginBottom: 8,
-                    border: "1px solid #d9d9d9",
-                    padding: 10,
-                    borderRadius: 4,
-                  }}
-                >
-                  <div style={{ flex: 1 }}>
-                    <Form.Item
-                      {...restField}
-                      name={[name, "name"]}
-                      rules={[{ required: true, message: "Missing DNS Name" }]}
-                      label="DNS Name"
-                    >
-                      <Input placeholder="Google" />
-                    </Form.Item>
-
-                    <Form.Item
-                      {...restField}
-                      name={[name, "ip"]}
-                      rules={[{ required: true, message: "Missing IP" }]}
-                      label="IP Address"
-                    >
-                      <Input placeholder="8.8.8.8" />
-                    </Form.Item>
-                  </div>
-
-                  <div style={{ flex: 1 }}>
-                    <Form.Item
-                      {...restField}
-                      name={[name, "protocol"]}
-                      rules={[{ required: true, message: "Missing Protocol" }]}
-                      label="Protocol"
-                    >
-                      <Select
-                        options={[
-                          { label: "UDP", value: "udp" },
-                          { label: "TCP", value: "tcp" },
-                        ]}
-                      />
-                    </Form.Item>
-
-                    <Form.Item
-                      {...restField}
-                      name={[name, "port"]}
-                      rules={[{ required: true, message: "Missing Port" }]}
-                      label="Port"
-                    >
-                      <InputNumber min={1} style={{ width: "100%" }} />
-                    </Form.Item>
-                  </div>
-
-                  <Button
-                    type="text"
-                    danger
-                    onClick={() => remove(name)}
-                    icon={
-                      <span style={{ fontSize: 20, lineHeight: 1 }}>−</span>
-                    }
-                  />
-                </div>
+          <div className="form-group">
+            <label className="form-label">Accepted Status Codes</label>
+            <p className="form-hint mb-sm">Formats: 200, 200-299, 2xx, 20x, 2*. Press Enter to add.</p>
+            <div className="chip-input-wrap" onClick={(e) => (e.currentTarget.querySelector("input") as HTMLInputElement)?.focus()}>
+              {form.acceptedStatusCodes.map((code) => (
+                <span key={code} className="chip">
+                  {code}
+                  <button type="button" className="chip-remove" onClick={() => removeCode(code)}>×</button>
+                </span>
               ))}
-
-              <Form.Item>
-                <Button
-                  type="dashed"
-                  onClick={() => add()}
-                  block
-                  icon={<span>+</span>}
+              <input
+                className="chip-input"
+                value={codeInput}
+                onChange={(e) => setCodeInput(e.target.value)}
+                onKeyDown={handleCodeKeyDown}
+                placeholder={form.acceptedStatusCodes.length === 0 ? "Type a code..." : ""}
+              />
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-xs)", marginTop: "var(--space-sm)" }}>
+              {PRESET_STATUS_CODES.filter((p) => !form.acceptedStatusCodes.includes(p.value)).map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => addCode(p.value)}
+                  style={{ fontSize: "0.75rem" }}
                 >
-                  Add DNS Server
-                </Button>
-              </Form.Item>
-            </>
-          )}
-        </Form.List>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </details>
 
-        <Collapse style={{ marginBottom: 24 }} defaultActiveKey={["1"]}>
-          <Collapse.Panel header="Advanced" key="1">
-            <Form.Item name={["tls", "no_verify"]} valuePropName="checked">
-              <Checkbox
-              >Ignore TLS/SSL errors for HTTPS websites</Checkbox>
-            </Form.Item>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  name="acceptedStatusCodes"
-                  label="Accepted Status Codes"
-                  rules={[
-                    {
-                      required: true,
-                      message: "Please enter accepted status code patterns",
-                    },
-                  ]}
-                  tooltip={
-                    <>
-                      Supported formats:
-                      <br />• Single: <code>200</code>
-                      <br />• Range: <code>200-299</code>
-                      <br />• Wildcard: <code>2xx</code>, <code>20x</code>,{" "}
-                      <code>2*</code>
-                      <br />• Mix any of the above
-                    </>
-                  }
-                >
-                  <Select
-                    mode="tags"
-                    placeholder="Type status codes or select common patterns"
-                    tokenSeparators={[","]}
-                    allowClear
-                    options={[
-                      { label: "200 OK", value: "200" },
-                      { label: "201 Created", value: "201" },
-                      { label: "204 No Content", value: "204" },
-                      { label: "301 Redirect", value: "301" },
-                      { label: "302 Redirect", value: "302" },
-                      { label: "200–299", value: "200-299" },
-                      { label: "400–499", value: "400-499" },
-                      { label: "500–599", value: "500-599" },
-                      { label: "2xx", value: "2xx" },
-                      { label: "4xx", value: "4xx" },
-                      { label: "5xx", value: "5xx" },
-                      { label: "20x", value: "20x" },
-                      { label: "50x", value: "50x" },
-                    ]}
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-          </Collapse.Panel>
-        </Collapse>
-
-        <Form.Item style={{ marginBottom: 0 }}>
-          <Button type="primary" htmlType="submit" block loading={loading}>
-            {initialValues ? "Update Host" : "Create Host"}
-          </Button>
-        </Form.Item>
-      </Form>
-    );
-  }
-);
+      <button type="submit" className="btn btn-primary w-full" disabled={loading}>
+        {loading ? "Saving..." : initialValues ? "Update Host" : "Create Host"}
+      </button>
+    </form>
+  );
+};
 
 export default HostForm;

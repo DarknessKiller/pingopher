@@ -1,20 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
-  Table,
-  Button,
-  Modal,
-  Form,
-  Input,
-  Select,
-  Switch,
-  message,
-  Space,
-  Tag,
-  App,
-} from "antd";
-import type { ColumnsType } from "antd/es/table";
-import { PlusOutlined, EditOutlined, DeleteOutlined } from "@ant-design/icons";
-import {
   getNotifications,
   createNotification,
   updateNotification,
@@ -23,223 +8,249 @@ import {
   type Notification,
   type CreateNotificationRequest,
 } from "../api";
+import { useToast } from "./Toast";
+import { PlusIcon, EditIcon, DeleteIcon } from "./icons";
 import ResponsiveButton from "./ResponsiveButton";
-
-const { Option } = Select;
+import Modal from "./Modal";
+import ConfirmDialog from "./ConfirmDialog";
 
 interface NotificationManagerProps {
   host: Host;
 }
 
 const NotificationManager: React.FC<NotificationManagerProps> = ({ host }) => {
-  const { modal } = App.useApp();
+  const toast = useToast();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [editingNotification, setEditingNotification] = useState<
-    Notification | undefined
-  >(undefined);
+  const [editingNotification, setEditingNotification] = useState<Notification | undefined>(undefined);
+  const [confirmTarget, setConfirmTarget] = useState<{ id: string; label: string } | null>(null);
 
-  const [form] = Form.useForm<CreateNotificationRequest>();
+  const [form, setForm] = useState<CreateNotificationRequest>({
+    name: "",
+    type: "discord",
+    active: true,
+  });
+
   const controllerRef = useRef<AbortController | null>(null);
 
   const fetchNotifications = useCallback(async ({ showLoading = true } = {}) => {
     if (controllerRef.current) controllerRef.current.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
-
     if (showLoading) setLoading(true);
     try {
-      const response = await getNotifications(host.id, {
-        signal: controller.signal,
-      });
-      if (!controller.signal.aborted) {
-        setNotifications(response.data || []);
-      }
+      const response = await getNotifications(host.id, { signal: controller.signal });
+      if (!controller.signal.aborted) setNotifications(response.data || []);
     } catch (error) {
-      if (!controller.signal.aborted) {
-        message.error((error as Error).message);
-      }
+      if (!controller.signal.aborted) toast.error((error as Error).message);
     } finally {
       if (!controller.signal.aborted && showLoading) setLoading(false);
     }
   }, [host.id]);
 
   useEffect(() => {
-    const load = async () => { await fetchNotifications({ showLoading: true }); };
-    load();
-    return () => {
-      if (controllerRef.current) controllerRef.current.abort();
-    };
+    fetchNotifications({ showLoading: true });
+    return () => { if (controllerRef.current) controllerRef.current.abort(); };
   }, [fetchNotifications]);
+
+  const setField = <K extends keyof CreateNotificationRequest>(key: K, val: CreateNotificationRequest[K]) =>
+    setForm((prev) => ({ ...prev, [key]: val }));
 
   const handleCreate = () => {
     setEditingNotification(undefined);
-    form.resetFields();
-    form.setFieldsValue({ type: "discord", active: true });
+    setForm({ name: "", type: "discord", active: true });
     setIsModalVisible(true);
   };
 
   const handleEdit = (record: Notification) => {
     setEditingNotification(record);
-    form.setFieldsValue(record);
+    setForm({
+      name: record.name,
+      type: record.type,
+      active: record.active,
+      discordWebhookUrl: record.discordWebhookUrl,
+      discordUsername: record.discordUsername,
+      discordPrefixMessage: record.discordPrefixMessage,
+    });
     setIsModalVisible(true);
   };
 
   const handleDelete = async (id: string) => {
     try {
       await deleteNotification(host.id, id);
-      message.success("Notification deleted");
+      toast.success("Notification deleted");
       fetchNotifications();
     } catch (error) {
-      message.error((error as Error).message);
+      toast.error((error as Error).message);
     }
   };
 
-  const onFinish = async (values: CreateNotificationRequest) => {
+  const onFinish = async (e: React.FormEvent) => {
+    e.preventDefault();
     setModalLoading(true);
     try {
       if (editingNotification) {
-        await updateNotification(host.id, editingNotification.id, values);
-        message.success("Notification updated");
+        await updateNotification(host.id, editingNotification.id, form);
+        toast.success("Notification updated");
       } else {
-        await createNotification(host.id, values);
-        message.success("Notification created");
+        await createNotification(host.id, form);
+        toast.success("Notification created");
       }
       setIsModalVisible(false);
       fetchNotifications();
     } catch (error) {
-      message.error((error as Error).message);
+      toast.error((error as Error).message);
     } finally {
       setModalLoading(false);
     }
   };
 
-  const columns: ColumnsType<Notification> = [
-    {
-      title: "Name",
-      dataIndex: "name",
-      key: "name",
-      sorter: (a, b) => a.name.localeCompare(b.name),
-    },
-    {
-      title: "Type",
-      dataIndex: "type",
-      key: "type",
-      render: (type: string) => <Tag color="blue">{type.toUpperCase()}</Tag>,
-      sorter: (a, b) => a.type.localeCompare(b.type),
-    },
-    {
-      title: "Active",
-      dataIndex: "active",
-      key: "active",
-      render: (active: boolean) => (
-        <Tag color={active ? "green" : "red"}>
-          {active ? "Active" : "Inactive"}
-        </Tag>
-      ),
-      sorter: (a, b) => Number(a.active) - Number(b.active),
-    },
-    {
-      title: "Actions",
-      key: "actions",
-      align: "right",
-      render: (_, record) => (
-        <Space>
-          <Button icon={<EditOutlined />} onClick={() => handleEdit(record)} />
-          <Button
-            icon={<DeleteOutlined />}
-            danger
-            onClick={() =>
-              modal.confirm({
-                title: "Are you sure?",
-                content: "This action cannot be undone.",
-                centered: true,
-                onOk: () => handleDelete(record.id),
-              })
-            }
-          />
-        </Space>
-      ),
-    },
-  ];
-
   return (
     <div>
-      <div
-        style={{
-          marginBottom: 16,
-          display: "flex",
-          justifyContent: "flex-end",
-          gap: 8,
-        }}
-      >
-        <ResponsiveButton
-          text="Add Notification"
-          icon={<PlusOutlined />}
-          onClick={handleCreate}
-        />
+      <div className="flex" style={{ justifyContent: "flex-end", marginBottom: "var(--space-md)" }}>
+        <ResponsiveButton text="Add Notification" icon={<PlusIcon size={16} />} onClick={handleCreate} />
       </div>
 
-      <Table
-        columns={columns}
-        dataSource={notifications}
-        rowKey="id"
-        loading={loading}
-        pagination={false}
-        scroll={{ x: "max-content" }}
-      />
+      {loading ? (
+        <div style={{ display: "flex", justifyContent: "center", padding: "var(--space-xl)" }}>
+          <div className="spinner" />
+        </div>
+      ) : (
+        <div className="table-container">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Active</th>
+                <th style={{ textAlign: "right" }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {notifications.map((n) => (
+                <tr key={n.id}>
+                  <td style={{ fontWeight: 500 }}>{n.name}</td>
+                  <td><span className="tag tag-info">{n.type.toUpperCase()}</span></td>
+                  <td>
+                    <span className={`tag ${n.active ? "tag-success" : "tag-danger"}`}>
+                      {n.active ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="table-actions">
+                      <button className="btn btn-ghost btn-icon btn-sm" onClick={() => handleEdit(n)}>
+                        <EditIcon size={14} />
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-icon btn-sm"
+                        style={{ color: "var(--danger)" }}
+                        onClick={() => setConfirmTarget({ id: n.id, label: n.name })}
+                      >
+                        <DeleteIcon size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {notifications.length === 0 && (
+                <tr><td colSpan={4} style={{ textAlign: "center", padding: "var(--space-xl)", color: "var(--text-tertiary)" }}>No notifications</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
+      {/* Add/Edit Modal */}
       <Modal
-        title={editingNotification ? "Edit Notification" : "Add Notification"}
         open={isModalVisible}
-        onCancel={() => setIsModalVisible(false)}
-        onOk={() => form.submit()}
-        confirmLoading={modalLoading}
+        onClose={() => setIsModalVisible(false)}
+        title={editingNotification ? "Edit Notification" : "Add Notification"}
+        zIndex={1100}
       >
-        <Form form={form} layout="vertical" onFinish={onFinish}>
-          <Form.Item name="name" label="Name" rules={[{ required: true }]}>
-            <Input placeholder="My Discord Alert" />
-          </Form.Item>
+        <form onSubmit={onFinish}>
+          <div className="form-group">
+            <label className="form-label">Name</label>
+            <input
+              className="form-input"
+              placeholder="My Discord Alert"
+              required
+              value={form.name}
+              onChange={(e) => setField("name", e.target.value)}
+            />
+          </div>
 
-          <Form.Item name="type" label="Type" rules={[{ required: true }]}>
-            <Select>
-              <Option value="discord">Discord</Option>
-            </Select>
-          </Form.Item>
+          <div className="form-group">
+            <label className="form-label">Type</label>
+            <select className="form-select" value={form.type} onChange={(e) => setField("type", e.target.value)}>
+              <option value="discord">Discord</option>
+            </select>
+          </div>
 
-          <Form.Item name="active" label="Active" valuePropName="checked">
-            <Switch />
-          </Form.Item>
+          <div className="form-group">
+            <label className="form-label">Active</label>
+            <button
+              type="button"
+              className={`toggle-switch ${form.active ? "active" : ""}`}
+              onClick={() => setField("active", !form.active)}
+            />
+          </div>
 
-          {/* Conditional Discord fields */}
-          <Form.Item
-            noStyle
-            shouldUpdate={(prev, current) => prev.type !== current.type}
-          >
-            {({ getFieldValue }) =>
-              getFieldValue("type") === "discord" && (
-                <>
-                  <Form.Item
-                    name="discordWebhookUrl"
-                    label="Webhook URL"
-                    rules={[{ required: true, type: "url" }]}
-                  >
-                    <Input />
-                  </Form.Item>
-                  <Form.Item name="discordUsername" label="Username">
-                    <Input placeholder="Pingopher" />
-                  </Form.Item>
-                  <Form.Item name="discordPrefixMessage" label="Prefix Message">
-                    <Input.TextArea placeholder="@here" />
-                  </Form.Item>
-                </>
-              )
-            }
-          </Form.Item>
-        </Form>
+          {form.type === "discord" && (
+            <>
+              <div className="form-group">
+                <label className="form-label">Webhook URL</label>
+                <input
+                  className="form-input"
+                  type="url"
+                  required
+                  value={form.discordWebhookUrl ?? ""}
+                  onChange={(e) => setField("discordWebhookUrl", e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Username</label>
+                <input
+                  className="form-input"
+                  placeholder="Pingopher"
+                  value={form.discordUsername ?? ""}
+                  onChange={(e) => setField("discordUsername", e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Prefix Message</label>
+                <textarea
+                  className="form-input"
+                  placeholder="@here"
+                  rows={2}
+                  style={{ resize: "vertical" }}
+                  value={form.discordPrefixMessage ?? ""}
+                  onChange={(e) => setField("discordPrefixMessage", e.target.value)}
+                />
+              </div>
+            </>
+          )}
+
+          <div className="flex gap-sm" style={{ justifyContent: "flex-end", marginTop: "var(--space-lg)" }}>
+            <button type="button" className="btn" onClick={() => setIsModalVisible(false)}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={modalLoading}>
+              {modalLoading ? "Saving..." : editingNotification ? "Update" : "Create"}
+            </button>
+          </div>
+        </form>
       </Modal>
+
+      <ConfirmDialog
+        open={!!confirmTarget}
+        title="Are you sure?"
+        message={`Delete notification "${confirmTarget?.label}"? This action cannot be undone.`}
+        onConfirm={() => {
+          if (confirmTarget) handleDelete(confirmTarget.id);
+          setConfirmTarget(null);
+        }}
+        onCancel={() => setConfirmTarget(null)}
+      />
     </div>
   );
 };

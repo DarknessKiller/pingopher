@@ -1,12 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Line, type Datum } from "@antv/g2plot";
 import { getHostHistory, type Host, type Result } from "../api";
-import { Spin, Empty, message, Select, Row, Col, Statistic, Card, Timeline, Tag } from "antd";
-import { CheckCircleOutlined, CloseCircleOutlined, ClockCircleOutlined } from "@ant-design/icons";
+import { useToast } from "./Toast";
 import { computeRange } from "../utils/date";
 import { processHistoryResults, type ParsedHistory, type DowntimeEvent } from "../utils/historyParser";
-
-const { Option } = Select;
+import { CheckCircleIcon, XCircleIcon, ClockIcon } from "./icons";
 
 interface HostDetailProps {
   host: Host;
@@ -21,15 +19,10 @@ const TIME_RANGES = [
   { label: "Last 30 days", value: "30d" },
 ] as const;
 
-const overlayStyle: React.CSSProperties = {
-  position: "absolute",
-  top: "50%",
-  left: "50%",
-  transform: "translate(-50%, -50%)",
-  zIndex: 1,
-};
+const APPLE_PALETTE = ["#007aff", "#34c759", "#ff9500", "#ff3b30", "#af52de", "#5ac8fa", "#ffcc00", "#ff2d55"];
 
 const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
+  const toast = useToast();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<Line | null>(null);
 
@@ -38,30 +31,20 @@ const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
   const [downtimes, setDowntimes] = useState<DowntimeEvent[]>([]);
   const [uptimePercent, setUptimePercent] = useState<number>(100);
   const [dnsColors, setDnsColors] = useState<Record<string, string>>({});
-
   const [range, setRange] = useState<(typeof TIME_RANGES)[number]["value"]>("30m");
 
   useEffect(() => {
     if (!host) return;
-
     const controller = new AbortController();
 
     const fetchData = async () => {
       setLoading(true);
       const { startAt, endAt } = computeRange(range);
-
       try {
-        const response = await getHostHistory(host.id, startAt, endAt, {
-          signal: controller.signal,
-        });
-
+        const response = await getHostHistory(host.id, startAt, endAt, { signal: controller.signal });
         if (controller.signal.aborted) return;
-
         const results: Result[] = response.data?.results ?? [];
-
-        // Delegate parsing logic to utility module
         const processed = processHistoryResults(results, host);
-
         setUptimePercent(processed.uptimePercent);
         setDnsColors(processed.dnsColors);
         setData(processed.parsed);
@@ -69,7 +52,7 @@ const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
       } catch (err) {
         if (!controller.signal.aborted) {
           console.error(err);
-          message.error((err as Error).message);
+          toast.error((err as Error).message);
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
@@ -77,13 +60,9 @@ const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
     };
 
     fetchData();
-
-    return () => {
-      controller.abort();
-    };
+    return () => { controller.abort(); };
   }, [host, range]);
 
-  // ---- Initialize Chart Once ----
   useEffect(() => {
     if (!containerRef.current || chartRef.current) return;
 
@@ -92,17 +71,20 @@ const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
       xField: "time",
       yField: "latencyValue",
       seriesField: "dns",
-      yAxis: { label: { formatter: (v) => `${v} ms` } },
+      color: APPLE_PALETTE,
+      yAxis: {
+        label: { formatter: (v) => `${v} ms` },
+      },
       tooltip: {
-        formatter: (datum: Datum) => {
-          return { name: String(datum.dns), value: datum.latencyValue !== null ? `${datum.latencyValue} ms` : '-' };
-        },
+        formatter: (datum: Datum) => ({
+          name: String(datum.dns),
+          value: datum.latencyValue !== null ? `${datum.latencyValue} ms` : "-",
+        }),
       },
       legend: { position: "top" },
       smooth: true,
       lineStyle: { lineWidth: 2 },
     });
-
     chartRef.current.render();
 
     return () => {
@@ -111,110 +93,101 @@ const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
     };
   }, []);
 
-  // ---- Update chart when data changes ----
   useEffect(() => {
     if (chartRef.current) {
       const annotations = downtimes.map((dt) => ({
-        type: 'region' as const,
-        start: [dt.formattedStart, 'min'] as [string, string],
-        end: [dt.formattedEnd || (data.length > 0 ? data[data.length - 1].time : dt.formattedStart), 'max'] as [string, string],
-        style: {
-          fill: '#ff4d4f',
-          fillOpacity: 0.15,
-        },
+        type: "region" as const,
+        start: [dt.formattedStart, "min"] as [string, string],
+        end: [
+          dt.formattedEnd || (data.length > 0 ? data[data.length - 1].time : dt.formattedStart),
+          "max",
+        ] as [string, string],
+        style: { fill: "var(--danger)", fillOpacity: 0.15 },
       }));
-
       chartRef.current.update({
         data,
         annotations,
-        color: (datum: Datum) => dnsColors[datum.dns] || '#5B8FF9',
+        color: (datum: Datum) => dnsColors[datum.dns] || APPLE_PALETTE[0],
       });
     }
   }, [data, downtimes, dnsColors]);
 
   return (
     <div>
-      <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", flexWrap: "wrap", alignItems: "center" }}>
-        <h4 style={{ marginBottom: 16 }}>Latency History</h4>
-
-        <Select
-          value={range}
-          onChange={setRange}
-          style={{ width: 200, marginBottom: 16 }}
-        >
-          {TIME_RANGES.map((r) => (
-            <Option key={r.value} value={r.value}>
-              {r.label}
-            </Option>
-          ))}
-        </Select>
+      {/* Stats */}
+      <div className="stat-row">
+        <div className="card card-sm">
+          <div className="stat-card">
+            <div className={`stat-card-icon ${uptimePercent >= 95 ? "success" : "danger"}`}>
+              {uptimePercent >= 95 ? <CheckCircleIcon size={20} /> : <XCircleIcon size={20} />}
+            </div>
+            <div>
+              <div className="stat-card-value" style={{ color: uptimePercent >= 95 ? "var(--success)" : "var(--danger)" }}>
+                {uptimePercent.toFixed(2)}%
+              </div>
+              <div className="stat-card-label">Uptime</div>
+            </div>
+          </div>
+        </div>
+        <div className="card card-sm">
+          <div className="stat-card">
+            <div className={`stat-card-icon ${downtimes.length === 0 ? "success" : "danger"}`}>
+              <ClockIcon size={20} />
+            </div>
+            <div>
+              <div className="stat-card-value" style={{ color: downtimes.length === 0 ? "var(--success)" : "var(--danger)" }}>
+                {downtimes.length}
+              </div>
+              <div className="stat-card-label">Incidents</div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={12} md={8}>
-          <Card size="small">
-            <Statistic
-              title="Uptime"
-              value={uptimePercent}
-              precision={2}
-              suffix="%"
-              valueStyle={{ color: uptimePercent >= 95 ? '#3f8600' : '#cf1322' }}
-              prefix={uptimePercent >= 95 ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
-            />
-          </Card>
-        </Col>
-        <Col xs={24} sm={12} md={8}>
-          <Card size="small">
-            <Statistic
-              title="Incidents"
-              value={downtimes.length}
-              prefix={<ClockCircleOutlined />}
-              valueStyle={{ color: downtimes.length === 0 ? '#3f8600' : '#cf1322' }}
-            />
-          </Card>
-        </Col>
-      </Row>
+      {/* Chart */}
+      <div className="chart-header">
+        <h4>Latency History</h4>
+        <select className="form-select" style={{ width: 200 }} value={range} onChange={(e) => setRange(e.target.value as typeof range)}>
+          {TIME_RANGES.map((r) => (
+            <option key={r.value} value={r.value}>{r.label}</option>
+          ))}
+        </select>
+      </div>
 
-      <div style={{ position: "relative", height: 400, marginBottom: 24 }}>
+      <div className="chart-container">
         {loading && (
-          <div style={overlayStyle}>
-            <Spin size="large" />
+          <div className="overlay-center">
+            <div className="spinner spinner-lg" />
           </div>
         )}
-
         {!loading && data.length === 0 && (
-          <div style={overlayStyle}>
-            <Empty description="No history data available" />
+          <div className="overlay-center">
+            <div className="empty-state">
+              <ClockIcon size={32} />
+              <span>No history data available</span>
+            </div>
           </div>
         )}
-
         <div ref={containerRef} style={{ height: "100%" }} />
       </div>
 
+      {/* Downtime Timeline */}
       {downtimes.length > 0 && (
-        <div style={{ marginTop: 24 }}>
-          <h4 style={{ marginBottom: 16 }}>Downtime Events</h4>
-          <div style={{ maxHeight: 300, overflowY: 'auto', paddingRight: 16 }}>
-            <Timeline
-              items={downtimes.map((dt, idx) => ({
-                key: idx,
-                color: dt.end ? 'red' : 'orange',
-                children: (
-                  <div>
-                    <div style={{ fontWeight: 'bold' }}>
-                      {dt.formattedStart} {dt.formattedEnd ? ` - ${dt.formattedEnd}` : ' - Now'}
-                    </div>
-                    <div style={{ marginTop: 4 }}>
-                      <Tag color={dnsColors[dt.dns] || "geekblue"}>{dt.dns}</Tag>
-                      <Tag color="error">{dt.reason}</Tag>
-                      <span style={{ marginLeft: 8, color: '#888' }}>
-                        Duration: {dt.durationString}
-                      </span>
-                    </div>
-                  </div>
-                ),
-              }))}
-            />
+        <div>
+          <h4 style={{ marginBottom: "var(--space-md)", fontWeight: 600 }}>Downtime Events</h4>
+          <div className="timeline">
+            {downtimes.map((dt, idx) => (
+              <div key={idx} className={`timeline-item ${dt.end ? "down" : "partial"}`}>
+                <div className="timeline-item-time">
+                  {dt.formattedStart} {dt.formattedEnd ? `– ${dt.formattedEnd}` : "– Now"}
+                </div>
+                <div className="timeline-item-meta">
+                  <span className="tag tag-info">{dt.dns}</span>
+                  <span className="tag tag-danger">{dt.reason}</span>
+                  <span className="timeline-item-duration">Duration: {dt.durationString}</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

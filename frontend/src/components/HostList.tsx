@@ -1,413 +1,309 @@
-  import React, { useEffect, useRef, useState, useMemo, Suspense, lazy } from "react";
-  import {
-    Table,
-    Button,
-    Tag,
-    Space,
-    Modal,
-    message,
-    Row,
-    Col,
-    Card,
-    Select,
-    App,
-    FormInstance,
-  } from "antd";
-  import {
-    EditOutlined,
-    DeleteOutlined,
-    PlusOutlined,
-    HistoryOutlined,
-    BellOutlined,
-  } from "@ant-design/icons";
-  import { CreateHostRequest, getHosts, deleteHost, type Host } from "../api";
-  import HostForm from "./HostForm";
-  const HostDetail = lazy(() => import("./HostDetail"));
-  import NotificationManager from "./NotificationManager";
-  import type { ColumnsType } from "antd/es/table";
-  import ResponsiveButton from "./ResponsiveButton";
+import React, { useEffect, useRef, useState, useMemo, Suspense, lazy } from "react";
+import { getHosts, deleteHost, type Host } from "../api";
+import { useToast } from "./Toast";
+import { PlusIcon, BellIcon, HistoryIcon, EditIcon, DeleteIcon } from "./icons";
+import HostForm from "./HostForm";
+import ResponsiveButton from "./ResponsiveButton";
+import Modal from "./Modal";
+import ConfirmDialog from "./ConfirmDialog";
 
-  interface HostActionsProps {
-    host: Host;
-    size?: "small" | "middle" | "large";
-    onNotifications: (host: Host) => void;
-    onDetail: (host: Host) => void;
-    onEdit: (host: Host) => void;
-    onDelete: (host: Host) => void;
-  }
+const HostDetail = lazy(() => import("./HostDetail"));
+const NotificationManager = lazy(() => import("./NotificationManager"));
 
-  const HostActions: React.FC<HostActionsProps> = ({ host, size, onNotifications, onDetail, onEdit, onDelete }) => (
-    <Space size="middle">
-      <Button icon={<BellOutlined />} size={size} onClick={() => onNotifications(host)} />
-      <Button icon={<HistoryOutlined />} size={size} onClick={() => onDetail(host)} />
-      <Button icon={<EditOutlined />} size={size} onClick={() => onEdit(host)} />
-      <Button danger icon={<DeleteOutlined />} size={size} onClick={() => onDelete(host)} />
-    </Space>
+const POLL_INTERVAL = 60000;
+
+const getHostUrl = (host: Host) => {
+  const portPart = host.port && host.port !== 0 ? `:${host.port}` : "";
+  return `${host.protocol}://${host.hostUrl}${portPart}`;
+};
+
+const comparators: Record<string, (a: Host, b: Host) => number> = {
+  name: (a, b) => a.name.localeCompare(b.name),
+  status: (a, b) => a.status.localeCompare(b.status),
+  pingInterval: (a, b) => a.pingInterval - b.pingInterval,
+  hostUrl: (a, b) => getHostUrl(a).localeCompare(getHostUrl(b)),
+};
+
+type SortField = keyof Host | "url";
+
+const HostList: React.FC = () => {
+  const toast = useToast();
+  const [hosts, setHosts] = useState<Host[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortOrder, setSortOrder] = useState<"ascend" | "descend" | null>(null);
+
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editingHost, setEditingHost] = useState<Host | undefined>(undefined);
+  const [detailVisible, setDetailVisible] = useState(false);
+  const [notificationVisible, setNotificationVisible] = useState(false);
+  const [selectedHost, setSelectedHost] = useState<Host | undefined>();
+  const [confirmTarget, setConfirmTarget] = useState<{ id: string; label: string } | null>(null);
+
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fetchControllerRef = useRef<AbortController | null>(null);
+
+  const sortedHosts = useMemo(() => {
+    if (!sortField || !sortOrder) return hosts;
+    const field = sortField === "url" ? "hostUrl" : sortField;
+    const cmp = comparators[field];
+    if (!cmp) return hosts;
+    const dir = sortOrder === "ascend" ? 1 : -1;
+    return [...hosts].sort((a, b) => dir * cmp(a, b));
+  }, [hosts, sortField, sortOrder]);
+
+  const fetchHosts = async (showLoading = true) => {
+    if (fetchControllerRef.current) fetchControllerRef.current.abort();
+    const controller = new AbortController();
+    fetchControllerRef.current = controller;
+    try {
+      if (showLoading) setLoading(true);
+      const response = await getHosts({ signal: controller.signal });
+      if (!controller.signal.aborted) setHosts(response.data.hosts);
+    } catch (err) {
+      if (!controller.signal.aborted) toast.error((err as Error).message);
+    } finally {
+      if (!controller.signal.aborted && showLoading) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const runPolling = async () => {
+      await fetchHosts(false);
+      if (!controller.signal.aborted) pollTimerRef.current = setTimeout(runPolling, POLL_INTERVAL);
+    };
+    (async () => {
+      await fetchHosts(true);
+      if (!controller.signal.aborted) pollTimerRef.current = setTimeout(runPolling, POLL_INTERVAL);
+    })();
+    return () => {
+      controller.abort();
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    };
+  }, []);
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteHost(id);
+      toast.success("Host deleted");
+      await fetchHosts(false);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  };
+
+  const handleEdit = (host: Host) => {
+    setEditingHost(host);
+    setIsModalVisible(true);
+  };
+
+  const handleCreate = () => {
+    setEditingHost(undefined);
+    setIsModalVisible(true);
+  };
+
+  const handleSuccess = async () => {
+    setIsModalVisible(false);
+    await fetchHosts(false);
+  };
+
+  const handleShowDetail = (host: Host) => {
+    setSelectedHost(host);
+    setDetailVisible(true);
+  };
+
+  const openNotifications = (host: Host) => {
+    setSelectedHost(host);
+    setNotificationVisible(true);
+  };
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      if (sortOrder === "ascend") setSortOrder("descend");
+      else if (sortOrder === "descend") {
+        setSortField(null);
+        setSortOrder(null);
+      }
+    } else {
+      setSortField(field);
+      setSortOrder("ascend");
+    }
+  };
+
+  const sortArrow = (field: SortField) => {
+    if (sortField !== field) return null;
+    return <span className="sort-arrow">{sortOrder === "ascend" ? "▲" : "▼"}</span>;
+  };
+
+  const renderStatus = (status: Host["status"]) => (
+    <span className="flex-center" style={{ gap: 0 }}>
+      <span className={`status-dot status-${status}`} />
+      <span className="status-text">{status}</span>
+    </span>
   );
 
-  const POLL_INTERVAL = 60000;
+  const HostActions: React.FC<{ host: Host; size?: "small" | "normal" }> = ({ host, size = "normal" }) => (
+    <div className="table-actions">
+      <button className={`btn btn-ghost btn-icon ${size === "small" ? "btn-sm" : ""}`} onClick={() => openNotifications(host)}>
+        <BellIcon size={size === "small" ? 14 : 16} />
+      </button>
+      <button className={`btn btn-ghost btn-icon ${size === "small" ? "btn-sm" : ""}`} onClick={() => handleShowDetail(host)}>
+        <HistoryIcon size={size === "small" ? 14 : 16} />
+      </button>
+      <button className={`btn btn-ghost btn-icon ${size === "small" ? "btn-sm" : ""}`} onClick={() => handleEdit(host)}>
+        <EditIcon size={size === "small" ? 14 : 16} />
+      </button>
+      <button
+        className={`btn btn-ghost btn-icon ${size === "small" ? "btn-sm" : ""}`}
+        style={{ color: "var(--danger)" }}
+        onClick={() => setConfirmTarget({ id: host.id, label: host.name })}
+      >
+        <DeleteIcon size={size === "small" ? 14 : 16} />
+      </button>
+    </div>
+  );
 
-  const getHostUrl = (host: Host) => {
-    const portPart = host.port && host.port !== 0 ? `:${host.port}` : "";
-    return `${host.protocol}://${host.hostUrl}${portPart}`;
-  };
+  return (
+    <div>
+      {/* Header */}
+      <div className="section-header">
+        <h2>Monitoring Hosts</h2>
+        <ResponsiveButton icon={<PlusIcon size={16} />} text="Add Host" onClick={handleCreate} />
+      </div>
 
-  const renderStatusTag = (status: Host["status"]) => {
-    const colorMap: Record<Host["status"], string> = {
-      up: "green",
-      down: "red",
-      unknown: "gold",
-    };
-    return <Tag color={colorMap[status]}>{status.toUpperCase()}</Tag>;
-  };
+      {/* Desktop Table */}
+      <div className="host-table-wrap">
+        {loading ? (
+          <div className="card" style={{ display: "flex", justifyContent: "center", padding: "var(--space-xl)" }}>
+            <div className="spinner" />
+          </div>
+        ) : (
+          <div className="table-container">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th className={sortField === "name" ? "sort-active" : ""} onClick={() => toggleSort("name")}>
+                    Name {sortArrow("name")}
+                  </th>
+                  <th className={sortField === "url" ? "sort-active" : ""} onClick={() => toggleSort("url")}>
+                    URL {sortArrow("url")}
+                  </th>
+                  <th className={sortField === "status" ? "sort-active" : ""} onClick={() => toggleSort("status")}>
+                    Status {sortArrow("status")}
+                  </th>
+                  <th className={sortField === "pingInterval" ? "sort-active" : ""} onClick={() => toggleSort("pingInterval")}>
+                    Interval {sortArrow("pingInterval")}
+                  </th>
+                  <th style={{ textAlign: "right" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedHosts.map((host) => (
+                  <tr key={host.id}>
+                    <td style={{ fontWeight: 500 }}>{host.name}</td>
+                    <td style={{ color: "var(--text-secondary)", fontSize: "0.875rem" }}>{getHostUrl(host)}</td>
+                    <td>{renderStatus(host.status as Host["status"])}</td>
+                    <td>{host.pingInterval}s</td>
+                    <td><HostActions host={host} /></td>
+                  </tr>
+                ))}
+                {sortedHosts.length === 0 && (
+                  <tr><td colSpan={5} style={{ textAlign: "center", padding: "var(--space-xl)", color: "var(--text-tertiary)" }}>No hosts yet</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
-  const comparators: Record<string, (a: Host, b: Host) => number> = {
-    name: (a, b) => a.name.localeCompare(b.name),
-    status: (a, b) => a.status.localeCompare(b.status),
-    pingInterval: (a, b) => a.pingInterval - b.pingInterval,
-    hostUrl: (a, b) => getHostUrl(a).localeCompare(getHostUrl(b)),
-  };
-
-  const HostList: React.FC = () => {
-    const { modal } = App.useApp()
-    const [hosts, setHosts] = useState<Host[]>([]);
-    const [loading, setLoading] = useState(true);
-    type SortField = keyof Host | "url";
-    const [sortField, setSortField] = useState<SortField | null>(null);
-    const [sortOrder, setSortOrder] = useState<"ascend" | "descend" | null>(null);
-
-    const [isModalVisible, setIsModalVisible] = useState(false);
-    const [editingHost, setEditingHost] = useState<Host | undefined>(undefined);
-    const formRef = useRef<FormInstance<CreateHostRequest>>(null);
-
-    const [detailVisible, setDetailVisible] = useState(false);
-    const [notificationVisible, setNotificationVisible] = useState(false);
-
-    const [selectedHost, setSelectedHost] = useState<Host | undefined>();
-
-    const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const fetchControllerRef = useRef<AbortController | null>(null);
-
-    // --------------------------
-    // Sorting
-    // --------------------------
-    const sortedHosts = useMemo(() => {
-      if (!sortField || !sortOrder) return hosts;
-      const field = sortField === "url" ? "hostUrl" : sortField;
-      const cmp = comparators[field];
-      if (!cmp) return hosts;
-      const dir = sortOrder === "ascend" ? 1 : -1;
-      return [...hosts].sort((a, b) => dir * cmp(a, b));
-    }, [hosts, sortField, sortOrder]);
-
-    // --------------------------
-    // Fetch hosts (used by handlers and polling)
-    // --------------------------
-    const fetchHosts = async (showLoading = true) => {
-      if (fetchControllerRef.current) fetchControllerRef.current.abort();
-      const controller = new AbortController();
-      fetchControllerRef.current = controller;
-
-      try {
-        if (showLoading) setLoading(true);
-        const response = await getHosts({ signal: controller.signal });
-        if (!controller.signal.aborted) {
-          setHosts(response.data.hosts);
-        }
-      } catch (err) {
-        if (!controller.signal.aborted) message.error((err as Error).message);
-      } finally {
-        if (!controller.signal.aborted && showLoading) setLoading(false);
-      }
-    };
-
-    // --------------------------
-    // Polling effect
-    // --------------------------
-    useEffect(() => {
-      const controller = new AbortController();
-
-      const runPolling = async () => {
-        await fetchHosts(false);
-        if (!controller.signal.aborted) {
-          pollTimerRef.current = setTimeout(runPolling, POLL_INTERVAL);
-        }
-      };
-
-      (async () => {
-        await fetchHosts(true);
-        if (!controller.signal.aborted) {
-          pollTimerRef.current = setTimeout(runPolling, POLL_INTERVAL);
-        }
-      })();
-
-      return () => {
-        controller.abort();
-        if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
-      };
-    }, []);
-
-    // --------------------------
-    // Handlers
-    // --------------------------
-    const handleDelete = async (id: string) => {
-      try {
-        await deleteHost(id);
-        message.success("Host deleted");
-        await fetchHosts(false);
-      } catch (err) {
-        message.error((err as Error).message);
-      }
-    };
-
-    const handleEdit = (host: Host) => {
-      setEditingHost(host);
-      setIsModalVisible(true);
-    };
-
-    const handleCreate = () => {
-      setEditingHost(undefined);
-      setIsModalVisible(true);
-    };
-
-    const handleSuccess = async () => {
-      setIsModalVisible(false);
-      await fetchHosts(false);
-    };
-
-    const handleShowDetail = (host: Host) => {
-      setSelectedHost(host);
-      setDetailVisible(true);
-    };
-
-    const showDeleteConfirm = (host: Host) => {
-      modal.confirm({
-        title: "Are you sure?",
-        content: "This action cannot be undone.",
-        centered: true,
-        onOk: () => handleDelete(host.id),
-      });
-    };
-
-    const openNotifications = (host: Host) => {
-      setSelectedHost(host);
-      setNotificationVisible(true);
-    };
-
-    // --------------------------
-    // Table columns
-    // --------------------------
-    const columns: ColumnsType<Host> = [
-      {
-        title: "Name",
-        dataIndex: "name",
-        key: "name",
-        sorter: comparators.name,
-      },
-      {
-        title: "URL",
-        key: "url",
-        render: (_, record) => getHostUrl(record),
-        sorter: comparators.hostUrl,
-      },
-      {
-        title: "Status",
-        dataIndex: "status",
-        render: renderStatusTag,
-        sorter: comparators.status,
-      },
-      {
-        title: "Interval",
-        dataIndex: "pingInterval",
-        render: (v: number) => `${v}s`,
-        sorter: comparators.pingInterval,
-      },
-      {
-        title: "Actions",
-        key: "actions",
-        align: "right",
-        render: (_, record) => (
-          <HostActions
-            host={record}
-            onNotifications={openNotifications}
-            onDetail={handleShowDetail}
-            onEdit={handleEdit}
-            onDelete={showDeleteConfirm}
-          />
-        ),
-      },
-    ];
-
-    // --------------------------
-    // Render
-    // --------------------------
-    return (
-      <div>
-        {/* Header */}
-        <div
-          style={{
-            marginBottom: 16,
-            display: "flex",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            alignItems: "center",
-          }}
-        >
-          <h2 style={{ margin: 0 }}>Monitoring Hosts</h2>
-          <ResponsiveButton
-            icon={<PlusOutlined />}
-            text="Add Host"
-            onClick={handleCreate}
-          />
-        </div>
-
-        {/* Desktop Table */}
-        <div className="desktop-table" style={{ display: "none" }}>
-          <Table
-            columns={columns}
-            dataSource={hosts}
-            rowKey="id"
-            loading={loading}
-            scroll={{ x: "max-content" }}
-            onChange={(_pagination, _filters, sorter) => {
-              if (!Array.isArray(sorter)) {
-                setSortField(sorter.order ? (sorter.field as keyof Host) : null);
-                setSortOrder(sorter.order || null);
+      {/* Mobile Cards */}
+      <div className="host-cards">
+        <div className="sort-bar">
+          <select
+            className="form-select"
+            value={sortField && sortOrder ? `${sortField}-${sortOrder}` : ""}
+            onChange={(e) => {
+              if (!e.target.value) {
+                setSortField(null);
+                setSortOrder(null);
+              } else {
+                const [field, order] = e.target.value.split("-");
+                setSortField(field as SortField);
+                setSortOrder(order as "ascend" | "descend");
               }
             }}
-          />
+          >
+            <option value="">Sort by...</option>
+            <option value="name-ascend">Name ↑</option>
+            <option value="name-descend">Name ↓</option>
+            <option value="status-ascend">Status ↑</option>
+            <option value="status-descend">Status ↓</option>
+            <option value="pingInterval-ascend">Interval ↑</option>
+            <option value="pingInterval-descend">Interval ↓</option>
+            <option value="url-ascend">URL ↑</option>
+            <option value="url-descend">URL ↓</option>
+          </select>
         </div>
+        {sortedHosts.map((host) => (
+          <div key={host.id} className="card host-card mb-md">
+            <div className="host-card-header">
+              <span className="host-card-name">{host.name}</span>
+              <HostActions host={host} size="small" />
+            </div>
+            <div className="host-card-url">{getHostUrl(host)}</div>
+            <div className="host-card-meta">
+              {renderStatus(host.status as Host["status"])}
+              <span>Interval: {host.pingInterval}s</span>
+            </div>
+          </div>
+        ))}
+      </div>
 
-        {/* Mobile Cards */}
-        <div className="mobile-cards" style={{ display: "none" }}>
-          {/* Mobile sorting dropdown */}
-          <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-            <Col span={24}>
-              <Select
-                placeholder="Sort by"
-                onChange={(value) => {
-                  if (!value) {
-                    setSortField(null);
-                    setSortOrder(null);
-                  } else {
-                    const [field, order] = (value as string).split("-");
-                    setSortField(field as keyof Host);
-                    setSortOrder(order as "ascend" | "descend");
-                  }
-                }}
-                style={{ width: 200 }}
-                allowClear
-              >
-                <Select.Option value="name-ascend">Name ↑</Select.Option>
-                <Select.Option value="name-descend">Name ↓</Select.Option>
-                <Select.Option value="status-ascend">Status ↑</Select.Option>
-                <Select.Option value="status-descend">Status ↓</Select.Option>
-                <Select.Option value="pingInterval-ascend">
-                  Interval ↑
-                </Select.Option>
-                <Select.Option value="pingInterval-descend">
-                  Interval ↓
-                </Select.Option>
-                <Select.Option value="url-ascend">URL ↑</Select.Option>
-                <Select.Option value="url-descend">URL ↓</Select.Option>
-              </Select>
-            </Col>
-          </Row>
-
-          <Row gutter={[16, 16]}>
-            {sortedHosts.map((host) => (
-              <Col xs={24} sm={12} key={host.id}>
-                <Card
-                  title={host.name}
-                  extra={
-                    <HostActions
-                      host={host}
-                      size="small"
-                      onNotifications={openNotifications}
-                      onDetail={handleShowDetail}
-                      onEdit={handleEdit}
-                      onDelete={showDeleteConfirm}
-                    />
-                  }
-                >
-                  <p>
-                    <strong>URL:</strong> {getHostUrl(host)}
-                  </p>
-                  <p>
-                    <strong>Status:</strong> {renderStatusTag(host.status)}
-                  </p>
-                  <p>
-                    <strong>Interval:</strong> {host.pingInterval}s
-                  </p>
-                </Card>
-              </Col>
-            ))}
-          </Row>
-        </div>
-
-        {/* Modals */}
+      {/* Edit/Create Modal */}
       <Modal
-        title={editingHost ? "Edit Host" : "Add Host"}
         open={isModalVisible}
-        onCancel={() => setIsModalVisible(false)}
-        footer={null}
-        centered
-        afterOpenChange={(open) => {
-          if (open && !editingHost && formRef.current) {
-            formRef.current.resetFields();
-          }
-        }}
+        onClose={() => setIsModalVisible(false)}
+        title={editingHost ? "Edit Host" : "Add Host"}
       >
         <HostForm
-          ref={formRef}
+          key={editingHost?.id ?? "new"}
           initialValues={editingHost}
           onSuccess={handleSuccess}
         />
       </Modal>
 
-        <Modal
-          title={`Details: ${selectedHost?.name ?? ""}`}
-          open={detailVisible}
-          onCancel={() => setDetailVisible(false)}
-          footer={null}
-          centered
-          width="90%"
-          destroyOnClose
-        >
-          {selectedHost ? (
-            <Suspense fallback={<div style={{ textAlign: "center", padding: "50px" }}>Loading Chart...</div>}>
-              <HostDetail key={selectedHost.id} host={selectedHost} />
-            </Suspense>
-          ) : null}
-        </Modal>
+      {/* Detail Modal */}
+      <Modal open={detailVisible} onClose={() => setDetailVisible(false)} title={`Details: ${selectedHost?.name ?? ""}`} width={900}>
+        {selectedHost && (
+          <Suspense fallback={<div style={{ textAlign: "center", padding: "var(--space-xl)" }}><div className="spinner spinner-lg" /></div>}>
+            <HostDetail key={selectedHost.id} host={selectedHost} />
+          </Suspense>
+        )}
+      </Modal>
 
-        <Modal
-          title={`Notifications: ${selectedHost?.name ?? ""}`}
-          open={notificationVisible}
-          onCancel={() => setNotificationVisible(false)}
-          footer={null}
-          centered
-          width="90%"
-          destroyOnClose
-        >
-          {selectedHost ? <NotificationManager key={selectedHost.id} host={selectedHost} /> : null}
-        </Modal>
+      {/* Notification Modal */}
+      <Modal open={notificationVisible} onClose={() => setNotificationVisible(false)} title={`Notifications: ${selectedHost?.name ?? ""}`} width={900}>
+        {selectedHost && (
+          <Suspense fallback={<div style={{ textAlign: "center", padding: "var(--space-xl)" }}><div className="spinner spinner-lg" /></div>}>
+            <NotificationManager key={selectedHost.id} host={selectedHost} />
+          </Suspense>
+        )}
+      </Modal>
 
-        {/* Responsive CSS */}
-        <style>
-          {`
-            @media (min-width: 768px) {
-              .desktop-table { display: block !important; }
-              .mobile-cards { display: none !important; }
-            }
-            @media (max-width: 767px) {
-              .desktop-table { display: none !important; }
-              .mobile-cards { display: block !important; }
-            }
-          `}
-        </style>
-      </div>
-    );
-  };
+      {/* Delete Confirmation */}
+      <ConfirmDialog
+        open={!!confirmTarget}
+        title="Are you sure?"
+        message={`Delete "${confirmTarget?.label}"? This action cannot be undone.`}
+        onConfirm={() => {
+          if (confirmTarget) handleDelete(confirmTarget.id);
+          setConfirmTarget(null);
+        }}
+        onCancel={() => setConfirmTarget(null)}
+      />
+    </div>
+  );
+};
 
-  export default HostList;
+export default HostList;
