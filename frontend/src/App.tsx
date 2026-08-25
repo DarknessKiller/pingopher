@@ -30,6 +30,7 @@ const App: React.FC = () => {
         <Sidebar darkMode={darkMode} onToggleTheme={() => setDarkMode((d) => !d)} />
         <main className="content">
           <HostList />
+          <div className="content-footer">Pingopher &copy;{new Date().getFullYear()} by DarknessKiller</div>
         </main>
         <BottomBar darkMode={darkMode} onToggleTheme={() => setDarkMode((d) => !d)} />
       </div>

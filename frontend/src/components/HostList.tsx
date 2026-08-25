@@ -168,7 +168,10 @@ const HostList: React.FC = () => {
     <div>
       {/* Header */}
       <div className="section-header">
-        <h2>Monitoring Hosts</h2>
+        <div>
+          <span className="mobile-brand">Pingopher</span>
+          <h2>Monitoring Hosts</h2>
+        </div>
         <ResponsiveButton icon={<PlusIcon size={16} />} text="Add Host" onClick={handleCreate} />
       </div>
 

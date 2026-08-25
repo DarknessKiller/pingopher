@@ -38,6 +38,20 @@ a:hover { text-decoration: underline; }
   min-width: 0;
   padding: var(--space-lg);
   padding-bottom: calc(var(--space-lg) + 80px);
+  overflow-x: hidden;
+}
+
+.content-footer {
+  text-align: center;
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+  padding: var(--space-lg) 0 var(--space-md);
+}
+
+@media (min-width: 768px) {
+  .content-footer {
+    display: none;
+  }
 }
 
 @media (min-width: 768px) {
@@ -122,6 +136,12 @@ a:hover { text-decoration: underline; }
   padding: var(--space-md) var(--space-lg);
   border-top: 1px solid var(--border);
   margin-top: auto;
+}
+
+.sidebar-copyright {
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+  margin-top: var(--space-sm);
 }
 
 /* ── Bottom Bar (mobile) ── */
@@ -389,6 +409,7 @@ a:hover { text-decoration: underline; }
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--space-md);
+  min-width: 0;
 }
 
 @media (min-width: 600px) {
@@ -612,6 +633,13 @@ a:hover { text-decoration: underline; }
   animation: modalScaleIn 250ms cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
+@media (max-width: 767px) {
+  .modal-content {
+    max-width: 100%;
+    border-radius: var(--radius-md);
+  }
+}
+
 .modal-overlay.closing .modal-content {
   animation: modalScaleOut 150ms ease forwards;
 }
@@ -804,6 +832,22 @@ a:hover { text-decoration: underline; }
   letter-spacing: -0.01em;
 }
 
+.mobile-brand {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .mobile-brand {
+    display: block;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+}
+
 /* ── Sort Dropdown ── */
 .sort-bar {
   margin-bottom: var(--space-md);
@@ -966,6 +1010,12 @@ a:hover { text-decoration: underline; }
   overflow: hidden;
 }
 
+@media (max-width: 767px) {
+  .chart-container {
+    height: 250px;
+  }
+}
+
 .chart-header {
   display: flex;
   align-items: center;
@@ -1056,6 +1106,8 @@ details .details-body {
 /* ── Host Card (mobile) ── */
 .host-card {
   padding: var(--space-md);
+  min-width: 0;
+  overflow: hidden;
 }
 
 .host-card-header {
@@ -1073,8 +1125,11 @@ details .details-body {
 .host-card-url {
   font-size: 0.8125rem;
   color: var(--text-secondary);
-  word-break: break-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   margin-bottom: var(--space-xs);
+  min-width: 0;
 }
 
 .host-card-meta {

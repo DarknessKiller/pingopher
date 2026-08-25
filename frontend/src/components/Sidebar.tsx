@@ -24,6 +24,7 @@ const Sidebar: React.FC<SidebarProps> = ({ darkMode, onToggleTheme }) => (
         {darkMode ? <SunIcon size={18} /> : <MoonIcon size={18} />}
         <span style={{ fontSize: "0.875rem" }}>{darkMode ? "Light Mode" : "Dark Mode"}</span>
       </button>
+      <div className="sidebar-copyright">Pingopher &copy;{new Date().getFullYear()} by DarknessKiller</div>
     </div>
   </aside>
 );
