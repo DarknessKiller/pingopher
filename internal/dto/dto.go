@@ -13,6 +13,12 @@ type ToModel[M any] interface {
 	ToModel() *M
 }
 
+// Validatable is implemented by DTOs that need cross-field validation beyond
+// struct tags (e.g. protocol-dependent required fields).
+type Validatable interface {
+	Validate() error
+}
+
 type ValidationError struct {
 	MissingFields []string `json:"missing_fields"`
 }
@@ -39,6 +45,12 @@ func BindAndMap[D ToModel[M], M any](ctx *gin.Context) (*M, error) {
 			}
 		}
 		return nil, err
+	}
+
+	if v, ok := any(&dto).(Validatable); ok {
+		if err := v.Validate(); err != nil {
+			return nil, err
+		}
 	}
 
 	return dto.ToModel(), nil

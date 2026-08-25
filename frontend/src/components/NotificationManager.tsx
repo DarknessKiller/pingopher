@@ -48,12 +48,33 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ host }) => {
     } finally {
       if (!controller.signal.aborted && showLoading) setLoading(false);
     }
-  }, [host.id]);
+  }, [host.id, toast]);
 
   useEffect(() => {
-    fetchNotifications({ showLoading: true });
-    return () => { if (controllerRef.current) controllerRef.current.abort(); };
-  }, [fetchNotifications]);
+    let cancelled = false;
+    const controller = new AbortController();
+    controllerRef.current = controller;
+
+    const load = async () => {
+      if (controllerRef.current !== controller) return;
+      setLoading(true);
+      try {
+        const response = await getNotifications(host.id, { signal: controller.signal });
+        if (!cancelled && !controller.signal.aborted) setNotifications(response.data || []);
+      } catch (error) {
+        if (!cancelled && !controller.signal.aborted) toast.error((error as Error).message);
+      } finally {
+        if (!cancelled && !controller.signal.aborted) setLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+      controller.abort();
+      if (controllerRef.current === controller) controllerRef.current = null;
+    };
+  }, [host.id, toast]);
 
   const setField = <K extends keyof CreateNotificationRequest>(key: K, val: CreateNotificationRequest[K]) =>
     setForm((prev) => ({ ...prev, [key]: val }));

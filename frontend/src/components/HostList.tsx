@@ -14,7 +14,15 @@ const POLL_INTERVAL = 60000;
 
 const getHostUrl = (host: Host) => {
   const portPart = host.port && host.port !== 0 ? `:${host.port}` : "";
-  return `${host.protocol}://${host.hostUrl}${portPart}`;
+  switch (host.protocol) {
+    case "tcp":
+    case "udp":
+      return `${host.hostUrl}${portPart}`;
+    case "ping":
+      return host.hostUrl;
+    default:
+      return `${host.protocol}://${host.hostUrl}${portPart}`;
+  }
 };
 
 const comparators: Record<string, (a: Host, b: Host) => number> = {
@@ -81,6 +89,7 @@ const HostList: React.FC = () => {
       controller.abort();
       if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleDelete = async (id: string) => {

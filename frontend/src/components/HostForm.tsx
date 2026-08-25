@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { createHost, updateHost, type Host, type CreateHostRequest } from "../api";
 import { useToast } from "./Toast";
 import { PlusIcon, CloseIcon } from "./icons";
@@ -12,7 +12,7 @@ const DEFAULT_VALUES: CreateHostRequest = {
   name: "",
   protocol: "https",
   hostUrl: "",
-  port: 0,
+  port: undefined,
   pingInterval: 60,
   failThreshold: 3,
   acceptedStatusCodes: ["200-299"],
@@ -47,7 +47,7 @@ function initForm(h?: Host): CreateHostRequest {
     port: h.port,
     pingInterval: h.pingInterval,
     failThreshold: h.failThreshold,
-    acceptedStatusCodes: [...h.acceptedStatusCodes],
+    acceptedStatusCodes: h.acceptedStatusCodes ? [...h.acceptedStatusCodes] : undefined,
     tls: { ...h.tls },
     dns: (h.dns ?? []).map((d) => ({ ...d })),
   };
@@ -59,22 +59,42 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [codeInput, setCodeInput] = useState("");
 
-  useEffect(() => {
+  // Reinitialize the form when switching between create and edit targets.
+  const [lastInitial, setLastInitial] = useState(initialValues);
+  if (initialValues !== lastInitial) {
+    setLastInitial(initialValues);
     setForm(initForm(initialValues));
-  }, [initialValues]);
+  }
 
   const set = <K extends keyof CreateHostRequest>(key: K, val: CreateHostRequest[K]) =>
     setForm((prev) => ({ ...prev, [key]: val }));
 
+  const isHTTP = form.protocol === "http" || form.protocol === "https";
+  const isHTTPS = form.protocol === "https";
+  const isPing = form.protocol === "ping";
+  const needsPort = form.protocol === "tcp" || form.protocol === "udp";
+  const showPort = !isPing;
+
+  const changeProtocol = (protocol: CreateHostRequest["protocol"]) => {
+    set("protocol", protocol);
+    // Accepted status codes only mean something for http(s); reset on switch.
+    const http = protocol === "http" || protocol === "https";
+    set("acceptedStatusCodes", http ? ["200-299"] : undefined);
+    if (http) set("tls", { no_verify: false });
+    // ICMP ping doesn't use a port; drop any stale value.
+    if (protocol === "ping") set("port", undefined);
+  };
+
   const addCode = (code: string) => {
     const trimmed = code.trim();
-    if (trimmed && !form.acceptedStatusCodes.includes(trimmed)) {
-      set("acceptedStatusCodes", [...form.acceptedStatusCodes, trimmed]);
+    const codes = form.acceptedStatusCodes ?? [];
+    if (trimmed && !codes.includes(trimmed)) {
+      set("acceptedStatusCodes", [...codes, trimmed]);
     }
   };
 
   const removeCode = (code: string) => {
-    set("acceptedStatusCodes", form.acceptedStatusCodes.filter((c) => c !== code));
+    set("acceptedStatusCodes", (form.acceptedStatusCodes ?? []).filter((c) => c !== code));
   };
 
   const handleCodeKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -83,8 +103,8 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
       addCode(codeInput);
       setCodeInput("");
     }
-    if (e.key === "Backspace" && !codeInput && form.acceptedStatusCodes.length > 0) {
-      removeCode(form.acceptedStatusCodes[form.acceptedStatusCodes.length - 1]);
+    if (e.key === "Backspace" && !codeInput && (form.acceptedStatusCodes ?? []).length > 0) {
+      removeCode(form.acceptedStatusCodes![form.acceptedStatusCodes!.length - 1]);
     }
   };
 
@@ -103,6 +123,14 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
     e.preventDefault();
     if (!form.name || !form.hostUrl) {
       toast.error("Name and Host URL are required");
+      return;
+    }
+    if (needsPort && !form.port) {
+      toast.error("Port is required for TCP/UDP");
+      return;
+    }
+    if (isHTTP && !form.acceptedStatusCodes?.length) {
+      toast.error("At least one accepted status code is required");
       return;
     }
     setLoading(true);
@@ -137,14 +165,21 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
         </div>
         <div className="form-group">
           <label className="form-label">Protocol</label>
-          <select className="form-select" value={form.protocol} onChange={(e) => set("protocol", e.target.value)}>
+          <select
+            className="form-select"
+            value={form.protocol}
+            onChange={(e) => changeProtocol(e.target.value as CreateHostRequest["protocol"])}
+          >
             <option value="http">HTTP</option>
             <option value="https">HTTPS</option>
+            <option value="tcp">TCP</option>
+            <option value="udp">UDP</option>
+            <option value="ping">Ping (ICMP)</option>
           </select>
         </div>
       </div>
 
-      <div className="form-grid form-grid-2 mb-md">
+      <div className={`form-grid ${showPort ? "form-grid-2" : ""} mb-md`}>
         <div className="form-group">
           <label className="form-label">Host URL / IP</label>
           <input
@@ -155,17 +190,21 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
             onChange={(e) => set("hostUrl", e.target.value)}
           />
         </div>
-        <div className="form-group">
-          <label className="form-label">Port</label>
-          <input
-            className="form-input"
-            type="number"
-            min={0}
-            max={65535}
-            value={form.port || ""}
-            onChange={(e) => set("port", parseInt(e.target.value) || 0)}
-          />
-        </div>
+        {showPort && (
+          <div className="form-group">
+            <label className="form-label">Port {needsPort && <span className="form-required">*</span>}</label>
+            <input
+              className="form-input"
+              type="number"
+              min={1}
+              max={65535}
+              required={needsPort}
+              placeholder={isHTTP ? "Optional (e.g. 443)" : "Required"}
+              value={form.port ?? ""}
+              onChange={(e) => set("port", parseInt(e.target.value) || undefined)}
+            />
+          </div>
+        )}
       </div>
 
       <div className="form-grid form-grid-3 mb-lg">
@@ -241,55 +280,59 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
         </button>
       </div>
 
-      {/* Advanced */}
-      <details className="mb-lg">
-        <summary>Advanced</summary>
-        <div className="details-body">
-          <div className="form-group">
-            <label style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={form.tls.no_verify}
-                onChange={(e) => set("tls", { no_verify: e.target.checked })}
-              />
-              Ignore TLS/SSL errors for HTTPS websites
-            </label>
-          </div>
+      {/* Advanced: TLS + accepted status codes only apply to HTTP(S) */}
+      {isHTTP && (
+        <details className="mb-lg">
+          <summary>Advanced</summary>
+          <div className="details-body">
+            {isHTTPS && (
+              <div className="form-group">
+                <label style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={form.tls.no_verify}
+                    onChange={(e) => set("tls", { no_verify: e.target.checked })}
+                  />
+                  Ignore TLS/SSL errors for HTTPS websites
+                </label>
+              </div>
+            )}
 
-          <div className="form-group">
-            <label className="form-label">Accepted Status Codes</label>
-            <p className="form-hint mb-sm">Formats: 200, 200-299, 2xx, 20x, 2*. Press Enter to add.</p>
-            <div className="chip-input-wrap" onClick={(e) => (e.currentTarget.querySelector("input") as HTMLInputElement)?.focus()}>
-              {form.acceptedStatusCodes.map((code) => (
-                <span key={code} className="chip">
-                  {code}
-                  <button type="button" className="chip-remove" onClick={() => removeCode(code)}>×</button>
-                </span>
-              ))}
-              <input
-                className="chip-input"
-                value={codeInput}
-                onChange={(e) => setCodeInput(e.target.value)}
-                onKeyDown={handleCodeKeyDown}
-                placeholder={form.acceptedStatusCodes.length === 0 ? "Type a code..." : ""}
-              />
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-xs)", marginTop: "var(--space-sm)" }}>
-              {PRESET_STATUS_CODES.filter((p) => !form.acceptedStatusCodes.includes(p.value)).map((p) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => addCode(p.value)}
-                  style={{ fontSize: "0.75rem" }}
-                >
-                  {p.label}
-                </button>
-              ))}
+            <div className="form-group">
+              <label className="form-label">Accepted Status Codes</label>
+              <p className="form-hint mb-sm">Formats: 200, 200-299, 2xx, 20x, 2*. Press Enter to add.</p>
+              <div className="chip-input-wrap" onClick={(e) => (e.currentTarget.querySelector("input") as HTMLInputElement)?.focus()}>
+                {(form.acceptedStatusCodes ?? []).map((code) => (
+                  <span key={code} className="chip">
+                    {code}
+                    <button type="button" className="chip-remove" onClick={() => removeCode(code)}>×</button>
+                  </span>
+                ))}
+                <input
+                  className="chip-input"
+                  value={codeInput}
+                  onChange={(e) => setCodeInput(e.target.value)}
+                  onKeyDown={handleCodeKeyDown}
+                  placeholder={(form.acceptedStatusCodes ?? []).length === 0 ? "Type a code..." : ""}
+                />
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-xs)", marginTop: "var(--space-sm)" }}>
+                {PRESET_STATUS_CODES.filter((p) => !(form.acceptedStatusCodes ?? []).includes(p.value)).map((p) => (
+                  <button
+                    key={p.value}
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => addCode(p.value)}
+                    style={{ fontSize: "0.75rem" }}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      </details>
+        </details>
+      )}
 
       <button type="submit" className="btn btn-primary w-full" disabled={loading}>
         {loading ? "Saving..." : initialValues ? "Update Host" : "Create Host"}

@@ -61,7 +61,7 @@ const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
 
     fetchData();
     return () => { controller.abort(); };
-  }, [host, range]);
+  }, [host, range, toast]);
 
   useEffect(() => {
     if (!containerRef.current || chartRef.current) return;

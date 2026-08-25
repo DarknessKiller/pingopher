@@ -8,15 +8,17 @@ export interface DNS {
   protocol: string;
 }
 
+export type HostProtocol = "http" | "https" | "tcp" | "udp" | "ping";
+
 export interface Host {
   id: string;
   name: string;
-  protocol: string;
+  protocol: HostProtocol;
   hostUrl: string;
-  port: number;
+  port?: number;
   pingInterval: number;
   failThreshold: number;
-  acceptedStatusCodes: string[];
+  acceptedStatusCodes?: string[];
   tls: { no_verify: boolean };
   status: string;
   dns?: DNS[];
@@ -57,12 +59,12 @@ export interface Notification {
 
 export interface CreateHostRequest {
   name: string;
-  protocol: string;
+  protocol: HostProtocol;
   hostUrl: string;
-  port: number;
+  port?: number;
   pingInterval: number;
   failThreshold: number;
-  acceptedStatusCodes: string[];
+  acceptedStatusCodes?: string[];
   tls: { no_verify: boolean };
   dns?: DNS[];
 }

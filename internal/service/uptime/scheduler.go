@@ -122,10 +122,8 @@ func (ps *Scheduler) scheduleHost(ctx context.Context, host *model.Host) {
 	}
 
 	jobID, err := ps.cron.AddFunc(spec, func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		ps.runPingForHost(ctx, host.ID.String())
+		// PingHost applies its own deadline, so a bare context is fine here.
+		ps.runPingForHost(context.Background(), host.ID.String())
 	})
 	if err != nil {
 		log.Printf("[%s] failed to schedule: %v", host.HostURL, err)

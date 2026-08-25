@@ -5,7 +5,8 @@ A self-hosted uptime monitoring tool with **multi-DNS support** — ping a singl
 ## Features
 
 - **Multi-DNS monitoring** — define custom DNS resolvers per host; Pingopher pings through all of them in parallel and records each result independently
-- **Scheduled health checks** — cron-based HTTP(S) pings with configurable intervals per host
+- **Multiple protocols** — monitor HTTP(S) sites, TCP/UDP services, and ICMP ping targets (IPv4 and IPv6) with configurable intervals per host
+- **Scheduled health checks** — cron-based pings with configurable intervals per host
 - **Dynamic backoff** — automatically reduces check frequency when a host is down, using exponential backoff up to a configurable max interval
 - **Status change detection** — detects up→down and down→up transitions, re-sending notifications on every change
 - **Repeated failure alerts** — re-notifies after N consecutive failures (configurable threshold)
@@ -21,7 +22,7 @@ A self-hosted uptime monitoring tool with **multi-DNS support** — ping a singl
 
 | Layer       | Technology                                                           |
 | ----------- | -------------------------------------------------------------------- |
-| Backend     | Go 1.26, Gin, GORM, Resty v3                                        |
+| Backend     | Go 1.27, Gin, GORM, Resty v3                                        |
 | Frontend    | React 19, TypeScript, Ant Design 6, Vite, @antv/g2plot              |
 | Database    | SQLite, Cloudflare D1                                                |
 | Cache       | Valkey (Redis-compatible)                                            |
@@ -39,6 +40,17 @@ Standard uptime monitors hit a single DNS resolver (usually the system default) 
 - **Resolver outages** — one resolver failing while others succeed
 
 Each ping result (status code, latency, DNS used, error) is recorded independently, so you can see exactly how each resolver performed at any point in time.
+
+## Protocols
+
+| Protocol | What it checks | Port | Accepted status codes |
+| -------- | -------------- | ---- | --------------------- |
+| `http` / `https` | HTTP(S) GET, latency + status code | optional | required |
+| `tcp` | TCP connection handshake | required | ignored |
+| `udp` | Sends a probe and waits for a reply (DNS query on port 53) | required | ignored |
+| `ping` | ICMP echo request (IPv4/IPv6) via a custom DNS resolver when configured | not used | ignored |
+
+For TCP/UDP/ping, a check is `up` when the probe succeeds and `down` otherwise; status-code matching only applies to HTTP(S).
 
 ## Getting Started
 

@@ -2,6 +2,7 @@ package discord
 
 import (
 	"fmt"
+	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -74,7 +75,7 @@ func (d DiscordNotification) Send(host *model.Host, histories []*model.History) 
 	fields = append(fields, discordEmbedField{Name: "Host", Value: host.Name, Inline: true})
 
 	if !d.DisableURL {
-		url := host.Protocol + "://" + host.HostURL
+		url := host.DisplayURL()
 		fields = append(fields, discordEmbedField{Name: "URL", Value: url, Inline: true})
 	}
 
@@ -91,7 +92,7 @@ func (d DiscordNotification) Send(host *model.Host, histories []*model.History) 
 
 		dnsAddr := host.DNS.IP
 		if host.DNS.Port != 0 {
-			dnsAddr += ":" + strconv.Itoa(int(host.DNS.Port))
+			dnsAddr = net.JoinHostPort(host.DNS.IP, strconv.Itoa(int(host.DNS.Port)))
 		}
 
 		fields = append(fields,

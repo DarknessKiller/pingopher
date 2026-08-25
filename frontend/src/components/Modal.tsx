@@ -14,9 +14,13 @@ interface ModalProps {
 const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, width, footer, zIndex }) => {
   const [closing, setClosing] = useState(false);
 
-  useEffect(() => {
-    if (!open) setClosing(false);
-  }, [open]);
+  // Reset the closing animation state when the modal is re-opened.
+  // Derived from `open` during render rather than in an effect.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    setClosing(false);
+  }
 
   useEffect(() => {
     if (!open) return;

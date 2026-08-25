@@ -19,9 +19,12 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 }) => {
   const [closing, setClosing] = useState(false);
 
-  useEffect(() => {
-    if (!open) setClosing(false);
-  }, [open]);
+  // Reset the closing animation state when the dialog is re-opened.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    setClosing(false);
+  }
 
   useEffect(() => {
     if (!open) return;

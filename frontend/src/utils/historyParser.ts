@@ -1,5 +1,6 @@
 import { type Host, type Result } from "../api";
 
+
 export interface ParsedHistory {
   latencyValue: number | null;
   time: string;
@@ -54,8 +55,17 @@ export const checkStatusCode = (status: number, patterns: string[] | undefined):
   return false;
 };
 
-const isResultDown = (item: Result, acceptedStatusCodes: string[] | undefined): boolean =>
-  !!item.errorMsg || (item.statusCode !== 0 && !checkStatusCode(item.statusCode, acceptedStatusCodes));
+const isResultDown = (
+  item: Result,
+  acceptedStatusCodes: string[] | undefined,
+  protocol: Host["protocol"]
+): boolean => {
+  // TCP/UDP/ping are reachability checks: StatusCode 0 means the probe failed.
+  if (protocol === "tcp" || protocol === "udp" || protocol === "ping") {
+    return item.statusCode === 0 || !!item.errorMsg;
+  }
+  return !!item.errorMsg || (item.statusCode !== 0 && !checkStatusCode(item.statusCode, acceptedStatusCodes));
+};
 
 export interface ProcessedHistoryData {
   dnsColors: Record<string, string>;
@@ -82,7 +92,7 @@ export const processHistoryResults = (results: Result[], host: Host): ProcessedH
   // Precompute isDown per result once to avoid redundant isResultDown calls
   const downMap = new Map<Result, boolean>();
   for (const r of results) {
-    downMap.set(r, isResultDown(r, host.acceptedStatusCodes));
+    downMap.set(r, isResultDown(r, host.acceptedStatusCodes, host.protocol));
   }
 
   // Group by DNS

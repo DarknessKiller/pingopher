@@ -3,7 +3,6 @@ package uptime_handler
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/DarknessKiller/pingopher/internal/dto"
 	"github.com/DarknessKiller/pingopher/internal/service/notification"
@@ -131,10 +130,8 @@ func (h *Handler) GetHistory(ctx *gin.Context) {
 
 func (h *Handler) pingHostAndNotify(ctx context.Context, hostID string) {
 	go func() {
+		// PingHost applies its own deadline, so only detach from the request.
 		ctx = context.WithoutCancel(ctx)
-
-		ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		defer cancel()
 
 		_, pingedHost, histories, err := h.service.PingHost(ctx, hostID)
 		if err != nil {
