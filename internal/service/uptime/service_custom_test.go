@@ -202,6 +202,24 @@ func TestService_PingHost_ICMP(t *testing.T) {
 			t.Errorf("expected status code 0, got %d", histories[0].StatusCode)
 		}
 	})
+
+	t.Run("ICMP_Failure_Reports_Socket_Error", func(t *testing.T) {
+		uptime.SetPingFuncForTest(func(ctx context.Context, target string) (time.Duration, error) {
+			return 0, errors.New("listen ip4:icmp : socket: permission denied")
+		})
+		defer uptime.ResetPingFuncForTest()
+
+		_, host, histories, err := svc.PingHost(context.Background(), hostID.String())
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+		if host.Status != model.HostStatusDown {
+			t.Errorf("expected DOWN, got %v", host.Status)
+		}
+		if histories[0].ErrorMessage != "listen ip4:icmp : socket: permission denied" {
+			t.Errorf("expected real socket error surfaced, got %q", histories[0].ErrorMessage)
+		}
+	})
 }
 
 func TestService_PingHost_IPv6_HTTP(t *testing.T) {

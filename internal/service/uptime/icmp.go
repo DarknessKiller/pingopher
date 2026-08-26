@@ -29,41 +29,54 @@ func ResetPingFuncForTest() {
 // privileged raw-socket path (root, or NET_RAW capability in Docker) and
 // falls back to the unprivileged datagram socket that Linux allows for
 // ping_group_range.
-func defaultPingICMP(ctx context.Context, target string) (time.Duration, error) {
-	pinger, err := probing.NewPinger(target)
+// runPinger executes one echo request on the given pinger and reports
+// latency. A run that sent the request but got no reply is a timeout, not a
+// socket error.
+func runPinger(ctx context.Context, pinger *probing.Pinger) (time.Duration, error) {
+	err := pinger.RunWithContext(ctx)
 	if err != nil {
 		return 0, err
 	}
+	stats := pinger.Statistics()
+	if stats.PacketsRecv == 0 {
+		return 0, fmt.Errorf("ping: no reply from %s (timeout)", pinger.Addr())
+	}
+	return stats.AvgRtt, nil
+}
 
-	pinger.Count = 1
-	pinger.Timeout = time.Second * 2
+// defaultPingICMP probes target with a single ICMP echo request. It prefers the
+// privileged raw-socket path (root, or NET_RAW capability in Docker) and
+// falls back to the unprivileged datagram socket that Linux allows for
+// ping_group_range.
+func defaultPingICMP(ctx context.Context, target string) (time.Duration, error) {
+	newPinger := func() (*probing.Pinger, error) {
+		p, err := probing.NewPinger(target)
+		if err != nil {
+			return nil, err
+		}
+		p.Count = 1
+		p.Timeout = time.Second * 2
+		return p, nil
+	}
+
+	pinger, err := newPinger()
+	if err != nil {
+		return 0, err
+	}
 	pinger.SetPrivileged(true)
 
-	if err := pinger.RunWithContext(ctx); err == nil {
-		stats := pinger.Statistics()
-		if stats.PacketsRecv > 0 {
-			return stats.AvgRtt, nil
-		}
+	if latency, runErr := runPinger(ctx, pinger); runErr == nil {
+		return latency, nil
 	}
 
 	// Privileged path unavailable (no raw socket) — retry unprivileged.
-	up, err := probing.NewPinger(target)
+	up, err := newPinger()
 	if err != nil {
 		return 0, err
 	}
-	up.Count = 1
-	up.Timeout = time.Second * 2
 	up.SetPrivileged(false)
 
-	if err := up.RunWithContext(ctx); err != nil {
-		return 0, err
-	}
-
-	stats := up.Statistics()
-	if stats.PacketsRecv == 0 {
-		return 0, fmt.Errorf("ping: no reply from %s", target)
-	}
-	return stats.AvgRtt, nil
+	return runPinger(ctx, up)
 }
 
 // buildICMPHistory resolves the target (honoring a custom DNS resolver) and
