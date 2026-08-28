@@ -1,5 +1,5 @@
-github.com/DarknessKiller/gorm-driver-d1 v0.0.2 h1:j2m+x7lqgax5UyjtWqGiWLGsRKprOxiujPre7I0D6Q0=
-github.com/DarknessKiller/gorm-driver-d1 v0.0.2/go.mod h1:6osAAGJ71ehx6IgaGJYxGdXBgj57exLxy37WtUUj2Rk=
+github.com/DarknessKiller/gorm-driver-d1 v0.0.3 h1:4Tm+G/ntyaL2V1GH9pwCpjXdLSL/uOZwgJCLlMser+Y=
+github.com/DarknessKiller/gorm-driver-d1 v0.0.3/go.mod h1:6osAAGJ71ehx6IgaGJYxGdXBgj57exLxy37WtUUj2Rk=
 github.com/bsm/ginkgo/v2 v2.12.0 h1:Ny8MWAHyOepLGlLKYmXG4IEkioBysk6GpaRTLC8zwWs=
 github.com/bsm/ginkgo/v2 v2.12.0/go.mod h1:SwYbGRRDovPVboqFv0tPTcG1sN61LM1Z4ARdbAV9g4c=
 github.com/bsm/gomega v1.27.10 h1:yeMWxP2pV2fG3FgAODIY8EiRE3dy0aeFYt4l7wh6yKA=

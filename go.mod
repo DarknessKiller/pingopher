@@ -61,6 +61,6 @@ require (
 	modernc.org/sqlite v1.57.0 // indirect
 )
 
-replace github.com/kofj/gorm-driver-d1 => github.com/DarknessKiller/gorm-driver-d1 v0.0.2
+replace github.com/kofj/gorm-driver-d1 => github.com/DarknessKiller/gorm-driver-d1 v0.0.3
 
-replace github.com/kofj/gorm-driver-d1/gormd1 => github.com/DarknessKiller/gorm-driver-d1/gormd1 v0.0.2
+replace github.com/kofj/gorm-driver-d1/gormd1 => github.com/DarknessKiller/gorm-driver-d1/gormd1 v0.0.3
