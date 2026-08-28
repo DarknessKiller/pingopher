@@ -25,13 +25,8 @@ func ResetPingFuncForTest() {
 	pingICMP = defaultPingICMP
 }
 
-// defaultPingICMP probes target with a single ICMP echo request. It prefers the
-// privileged raw-socket path (root, or NET_RAW capability in Docker) and
-// falls back to the unprivileged datagram socket that Linux allows for
-// ping_group_range.
-// runPinger executes one echo request on the given pinger and reports
-// latency. A run that sent the request but got no reply is a timeout, not a
-// socket error.
+// runPinger executes one echo request and reports latency. A run that sent
+// the request but got no reply is a timeout, not a socket error.
 func runPinger(ctx context.Context, pinger *probing.Pinger) (time.Duration, error) {
 	err := pinger.RunWithContext(ctx)
 	if err != nil {
@@ -42,6 +37,14 @@ func runPinger(ctx context.Context, pinger *probing.Pinger) (time.Duration, erro
 		return 0, fmt.Errorf("ping: no reply from %s (timeout)", pinger.Addr())
 	}
 	return stats.AvgRtt, nil
+}
+
+func isPermissionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "permission denied") || strings.Contains(msg, "operation not permitted")
 }
 
 // defaultPingICMP probes target with a single ICMP echo request. It prefers the
@@ -65,8 +68,12 @@ func defaultPingICMP(ctx context.Context, target string) (time.Duration, error) 
 	}
 	pinger.SetPrivileged(true)
 
-	if latency, runErr := runPinger(ctx, pinger); runErr == nil {
+	latency, privilegedErr := runPinger(ctx, pinger)
+	if privilegedErr == nil {
 		return latency, nil
+	}
+	if !isPermissionError(privilegedErr) {
+		return 0, privilegedErr
 	}
 
 	// Privileged path unavailable (no raw socket) — retry unprivileged.
