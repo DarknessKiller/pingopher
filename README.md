@@ -17,6 +17,7 @@ A self-hosted uptime monitoring tool with **multi-DNS support** — ping a singl
 - **RESTful API** — full CRUD for hosts and notification channels
 - **Redis caching** — fast in-memory caching with Valkey/Redis
 - **Multiple database backends** — SQLite (local) or Cloudflare D1 (edge)
+- **DNS answer cache** — reuses resolved addresses until the DNS server's own TTL expires, so frequent checks don't re-query
 
 ## Tech Stack
 

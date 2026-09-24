@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"strconv"
 	"strings"
 	"time"
 
@@ -86,11 +85,11 @@ func defaultPingICMP(ctx context.Context, target string) (time.Duration, error) 
 	return runPinger(ctx, up)
 }
 
-// buildICMPHistory resolves the target (honoring a custom DNS resolver) and
-// pings it. StatusCode 200 means a reply came back; 0 means it failed.
-// ping is injectable so tests can avoid real sockets.
-func buildICMPHistory(ctx context.Context, host *model.Host, dns model.DNS, ping func(context.Context, string) (time.Duration, error)) *model.History {
-	target, err := resolveICMPTarget(ctx, host.HostURL, dns)
+// buildICMPHistory resolves the target (honoring a custom DNS resolver and the
+// shared DNS cache) and pings it. StatusCode 200 means a reply came back; 0
+// means it failed. ping is injectable so tests can avoid real sockets.
+func (s *Service) buildICMPHistory(ctx context.Context, host *model.Host, dns model.DNS, ping func(context.Context, string) (time.Duration, error)) *model.History {
+	target, err := s.resolveICMPTarget(ctx, host.HostURL, dns)
 	if err != nil {
 		return &model.History{
 			StatusCode:   0,
@@ -119,27 +118,14 @@ func buildICMPHistory(ctx context.Context, host *model.Host, dns model.DNS, ping
 }
 
 // resolveICMPTarget returns a literal IP, or resolves a hostname through the
-// configured DNS resolver so multi-DNS monitoring applies to ping targets too.
-func resolveICMPTarget(ctx context.Context, host string, dns model.DNS) (string, error) {
+// configured DNS resolver (and shared cache) so multi-DNS monitoring applies
+// to ping targets too.
+func (s *Service) resolveICMPTarget(ctx context.Context, host string, dns model.DNS) (string, error) {
 	if ip := net.ParseIP(host); ip != nil {
 		return host, nil
 	}
 
-	resolver := net.DefaultResolver
-	if dns != (model.DNS{Name: "System DNS"}) {
-		dnsAddr := dns.IP
-		if dns.Port != 0 {
-			dnsAddr = net.JoinHostPort(dns.IP, strconv.Itoa(int(dns.Port)))
-		}
-		resolver = &net.Resolver{
-			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-				d := net.Dialer{Timeout: 500 * time.Millisecond}
-				return d.DialContext(ctx, dns.Protocol, dnsAddr)
-			},
-		}
-	}
-
-	ips, err := resolver.LookupIPAddr(ctx, host)
+	ips, err := s.dnsCache.lookup(ctx, dns, host, resolveFuncFor(dns))
 	if err != nil {
 		return "", err
 	}
