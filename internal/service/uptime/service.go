@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"database/sql"
 	"errors"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -28,10 +29,16 @@ type Service struct {
 	config     *config.Config
 	repository Repository
 	cache      cache.Cache
+	dnsCache   *dnsCache
 }
 
 func NewService(config *config.Config, hostRepository repository.HostRepository, historyRepository repository.HistoryRepository, cacheClient cache.Cache) *Service {
-	return &Service{config: config, repository: &newRepository{HostRepo: hostRepository, HistoryRepo: historyRepository}, cache: cacheClient}
+	return &Service{
+		config:     config,
+		repository: &newRepository{HostRepo: hostRepository, HistoryRepo: historyRepository},
+		cache:      cacheClient,
+		dnsCache:   newDNSCache(),
+	}
 }
 
 func (s *Service) CreateHost(ctx context.Context, host *model.Host) error {
@@ -201,7 +208,7 @@ func (s *Service) makeRequestAndBuildHistory(ctx context.Context, host *model.Ho
 	case "udp":
 		return s.pingUDP(ctx, host, dns)
 	case "ping":
-		return buildICMPHistory(ctx, host, dns, pingICMP)
+		return s.buildICMPHistory(ctx, host, dns, pingICMP)
 	default:
 		return s.pingHTTP(ctx, host, dns)
 	}
@@ -221,10 +228,13 @@ func historyIsDown(host *model.Host, history *model.History) (bool, error) {
 }
 
 func (s *Service) pingHTTP(ctx context.Context, host *model.Host, dns model.DNS) *model.History {
-	client := resty.New()
+	client := resty.New().SetTimeout(pingTimeout)
 
-	if dns != (model.DNS{Name: "System DNS"}) {
-		client = resty.NewWithDialer(s.getDialer(dns)).SetTimeout(pingTimeout)
+	// Route HTTP dialing through the shared DNS cache instead of letting the
+	// transport re-resolve (and re-query) the host on every check.
+	if transport, err := client.HTTPTransport(); err == nil {
+		transport.DialContext = s.getDialer(dns).DialContext
+		client.SetTransport(transport)
 	}
 
 	userAgent := "Pingopher/Alpha (https://github.com/DarknessKiller/pingopher)"
@@ -366,29 +376,43 @@ func targetAddr(host *model.Host) string {
 	return net.JoinHostPort(host.HostURL, strconv.Itoa(int(port)))
 }
 
-func (s *Service) getResolver(dns model.DNS) *net.Resolver {
-	if dns == (model.DNS{Name: "System DNS"}) {
-		return nil
-	}
-
-	dnsAddr := dns.IP
-	if dns.Port != 0 {
-		dnsAddr = net.JoinHostPort(dns.IP, strconv.Itoa(int(dns.Port)))
-	}
-
-	return &net.Resolver{
-		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
-			d := net.Dialer{Timeout: 500 * time.Millisecond}
-			return d.DialContext(ctx, dns.Protocol, dnsAddr)
-		},
-	}
+// cachingDialer resolves hostnames through the shared DNS cache, then dials the
+// resulting IPs. It backs TCP/UDP probes and the HTTP transport so a check
+// reuses a cached answer instead of querying the resolver on every run.
+type cachingDialer struct {
+	service *Service
+	dns     model.DNS
 }
 
-func (s *Service) getDialer(dns model.DNS) *net.Dialer {
-	return &net.Dialer{
-		Timeout:  pingTimeout,
-		Resolver: s.getResolver(dns),
+func (s *Service) getDialer(dns model.DNS) *cachingDialer {
+	return &cachingDialer{service: s, dns: dns}
+}
+
+func (d *cachingDialer) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	dialer := &net.Dialer{Timeout: pingTimeout}
+
+	host, port, err := net.SplitHostPort(address)
+	if err != nil || net.ParseIP(strings.Trim(host, "[]")) != nil {
+		return dialer.DialContext(ctx, network, address)
 	}
+
+	ips, err := d.service.dnsCache.lookup(ctx, d.dns, host, resolveFuncFor(d.dns))
+	if err != nil {
+		return nil, err
+	}
+
+	var lastErr error
+	for _, ip := range ips {
+		conn, err := dialer.DialContext(ctx, network, net.JoinHostPort(ip.IP.String(), port))
+		if err == nil {
+			return conn, nil
+		}
+		lastErr = err
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("no IPs found for %s", host)
+	}
+	return nil, lastErr
 }
 
 // latencyMilliseconds rounds a duration up to the nearest whole millisecond.
