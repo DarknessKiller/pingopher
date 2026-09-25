@@ -21,8 +21,8 @@ const dnsQueryTimeout = 2 * time.Second
 
 // dnsRecord is one resolved address and the TTL the server attached to it.
 type dnsRecord struct {
-	ip  net.IP
-	ttl time.Duration
+	IP  net.IP
+	TTL time.Duration
 }
 
 // resolveFunc performs one uncached lookup for host.
@@ -251,13 +251,13 @@ func parseResponse(resp []byte) ([]dnsRecord, string, error) {
 			if err != nil {
 				return nil, "", err
 			}
-			records = append(records, dnsRecord{ip: net.IP(r.A[:]), ttl: ttl})
+			records = append(records, dnsRecord{IP: net.IP(r.A[:]), TTL: ttl})
 		case dnsmessage.TypeAAAA:
 			r, err := parser.AAAAResource()
 			if err != nil {
 				return nil, "", err
 			}
-			records = append(records, dnsRecord{ip: net.IP(r.AAAA[:]), ttl: ttl})
+			records = append(records, dnsRecord{IP: net.IP(r.AAAA[:]), TTL: ttl})
 		case dnsmessage.TypeCNAME:
 			r, err := parser.CNAMEResource()
 			if err != nil {

@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"golang.org/x/net/dns/dnsmessage"
+
+	"github.com/DarknessKiller/pingopher/internal/service/uptime"
 )
 
 // TestQueryServerPacketIsWellFormed guards against the builder prefixing the
@@ -54,11 +56,11 @@ func TestQueryServerPacketIsWellFormed(t *testing.T) {
 		_, _ = conn.WriteTo(packed, addr)
 	}()
 
-	records, _, err := queryServer(context.Background(), conn.LocalAddr().String(), "udp", "example.com.", dnsmessage.TypeA)
+	records, _, err := uptime.QueryServer(context.Background(), conn.LocalAddr().String(), "udp", "example.com.", dnsmessage.TypeA)
 	if err != nil {
 		t.Fatalf("queryServer: %v", err)
 	}
-	if len(records) != 1 || !records[0].ip.Equal(net.ParseIP("192.0.2.1")) {
+	if len(records) != 1 || !records[0].IP.Equal(net.ParseIP("192.0.2.1")) {
 		t.Fatalf("unexpected records: %+v", records)
 	}
 }

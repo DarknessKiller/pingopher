@@ -55,11 +55,11 @@ func (c *dnsCache) lookup(ctx context.Context, dns model.DNS, host string, resol
 	}
 
 	ips := make([]net.IPAddr, 0, len(records))
-	ttl := records[0].ttl
+	ttl := records[0].TTL
 	for _, record := range records {
-		ips = append(ips, net.IPAddr{IP: record.ip})
-		if record.ttl < ttl {
-			ttl = record.ttl
+		ips = append(ips, net.IPAddr{IP: record.IP})
+		if record.TTL < ttl {
+			ttl = record.TTL
 		}
 	}
 

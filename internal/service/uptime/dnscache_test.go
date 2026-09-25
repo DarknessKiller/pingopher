@@ -10,20 +10,21 @@ import (
 	"golang.org/x/net/dns/dnsmessage"
 
 	"github.com/DarknessKiller/pingopher/internal/model"
+	"github.com/DarknessKiller/pingopher/internal/service/uptime"
 )
 
 func TestDNSCacheReusesAnswerWithinTTL(t *testing.T) {
-	cache := newDNSCache()
+	cache := uptime.NewDNSCache()
 
 	var calls int32
-	resolve := func(ctx context.Context, host string) ([]dnsRecord, error) {
+	resolve := func(ctx context.Context, host string) ([]uptime.DNSRecord, error) {
 		atomic.AddInt32(&calls, 1)
-		return []dnsRecord{{ip: net.ParseIP("192.0.2.1"), ttl: time.Hour}}, nil
+		return []uptime.DNSRecord{{IP: net.ParseIP("192.0.2.1"), TTL: time.Hour}}, nil
 	}
 
 	// Same resolver + host repeatedly: exactly one lookup.
 	for i := 0; i < 3; i++ {
-		if _, err := cache.lookup(context.Background(), model.DNS{Name: "System DNS"}, "example.com", resolve); err != nil {
+		if _, err := uptime.Lookup(cache, context.Background(), model.DNS{Name: "System DNS"}, "example.com", resolve); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -32,7 +33,7 @@ func TestDNSCacheReusesAnswerWithinTTL(t *testing.T) {
 	}
 
 	// A different resolver must not share the entry.
-	if _, err := cache.lookup(context.Background(), model.DNS{IP: "1.1.1.1"}, "example.com", resolve); err != nil {
+	if _, err := uptime.Lookup(cache, context.Background(), model.DNS{IP: "1.1.1.1"}, "example.com", resolve); err != nil {
 		t.Fatal(err)
 	}
 	if got := atomic.LoadInt32(&calls); got != 2 {
@@ -41,19 +42,19 @@ func TestDNSCacheReusesAnswerWithinTTL(t *testing.T) {
 }
 
 func TestDNSCacheExpiresAtServerTTL(t *testing.T) {
-	cache := newDNSCache()
+	cache := uptime.NewDNSCache()
 
 	var calls int32
-	resolve := func(ctx context.Context, host string) ([]dnsRecord, error) {
+	resolve := func(ctx context.Context, host string) ([]uptime.DNSRecord, error) {
 		atomic.AddInt32(&calls, 1)
-		return []dnsRecord{{ip: net.ParseIP("192.0.2.1"), ttl: 20 * time.Millisecond}}, nil
+		return []uptime.DNSRecord{{IP: net.ParseIP("192.0.2.1"), TTL: 20 * time.Millisecond}}, nil
 	}
 
-	if _, err := cache.lookup(context.Background(), model.DNS{}, "example.com", resolve); err != nil {
+	if _, err := uptime.Lookup(cache, context.Background(), model.DNS{}, "example.com", resolve); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(40 * time.Millisecond)
-	if _, err := cache.lookup(context.Background(), model.DNS{}, "example.com", resolve); err != nil {
+	if _, err := uptime.Lookup(cache, context.Background(), model.DNS{}, "example.com", resolve); err != nil {
 		t.Fatal(err)
 	}
 	if got := atomic.LoadInt32(&calls); got != 2 {
@@ -62,16 +63,16 @@ func TestDNSCacheExpiresAtServerTTL(t *testing.T) {
 }
 
 func TestDNSCacheDoesNotCacheZeroTTL(t *testing.T) {
-	cache := newDNSCache()
+	cache := uptime.NewDNSCache()
 
 	var calls int32
-	resolve := func(ctx context.Context, host string) ([]dnsRecord, error) {
+	resolve := func(ctx context.Context, host string) ([]uptime.DNSRecord, error) {
 		atomic.AddInt32(&calls, 1)
-		return []dnsRecord{{ip: net.ParseIP("192.0.2.1"), ttl: 0}}, nil
+		return []uptime.DNSRecord{{IP: net.ParseIP("192.0.2.1"), TTL: 0}}, nil
 	}
 
 	for i := 0; i < 2; i++ {
-		if _, err := cache.lookup(context.Background(), model.DNS{}, "example.com", resolve); err != nil {
+		if _, err := uptime.Lookup(cache, context.Background(), model.DNS{}, "example.com", resolve); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -81,16 +82,16 @@ func TestDNSCacheDoesNotCacheZeroTTL(t *testing.T) {
 }
 
 func TestDNSCacheDoesNotCacheErrors(t *testing.T) {
-	cache := newDNSCache()
+	cache := uptime.NewDNSCache()
 
 	var calls int32
-	failing := func(ctx context.Context, host string) ([]dnsRecord, error) {
+	failing := func(ctx context.Context, host string) ([]uptime.DNSRecord, error) {
 		atomic.AddInt32(&calls, 1)
 		return nil, context.DeadlineExceeded
 	}
 
 	for i := 0; i < 2; i++ {
-		if _, err := cache.lookup(context.Background(), model.DNS{}, "down.example", failing); err == nil {
+		if _, err := uptime.Lookup(cache, context.Background(), model.DNS{}, "down.example", failing); err == nil {
 			t.Fatal("expected lookup error")
 		}
 	}
@@ -118,14 +119,14 @@ func TestParseResponseReadsAddressesAndTTL(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	records, cname, err := parseResponse(packed)
+	records, cname, err := uptime.ParseResponse(packed)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cname != "" {
 		t.Fatalf("unexpected cname %q", cname)
 	}
-	if len(records) != 1 || !records[0].ip.Equal(net.ParseIP("192.0.2.1")) || records[0].ttl != 300*time.Second {
+	if len(records) != 1 || !records[0].IP.Equal(net.ParseIP("192.0.2.1")) || records[0].TTL != 300*time.Second {
 		t.Fatalf("unexpected records: %+v", records)
 	}
 }
@@ -150,7 +151,7 @@ func TestParseResponseFollowsCNAME(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	records, cname, err := parseResponse(packed)
+	records, cname, err := uptime.ParseResponse(packed)
 	if err != nil {
 		t.Fatal(err)
 	}
