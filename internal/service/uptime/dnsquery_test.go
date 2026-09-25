@@ -1,4 +1,4 @@
-package uptime
+package uptime_test
 
 import (
 	"context"
