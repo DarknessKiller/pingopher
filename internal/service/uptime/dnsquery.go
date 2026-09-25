@@ -133,8 +133,11 @@ func queryServer(ctx context.Context, server, network, host string, qtype dnsmes
 		return nil, "", err
 	}
 
+	// NewBuilder appends to the slice it is given, so hand it a zero-length
+	// slice; passing buf[:] would prefix the packet with len(buf) zero bytes and
+	// every server would reject it as malformed (FORMERR).
 	var buf [512]byte
-	builder := dnsmessage.NewBuilder(buf[:], dnsmessage.Header{RecursionDesired: true})
+	builder := dnsmessage.NewBuilder(buf[:0], dnsmessage.Header{RecursionDesired: true})
 	builder.EnableCompression()
 	if err := builder.StartQuestions(); err != nil {
 		return nil, "", err
