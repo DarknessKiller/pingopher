@@ -14,6 +14,7 @@ If there is no `.codegraph/` directory, skip CodeGraph entirely — indexing is 
 - Default to no comment. Add one only for the non-obvious why: a constraint, a workaround, a trap.
 - One line, above the line it explains. A comment that restates the code or the name goes.
 - Rationale longer than a line belongs in the commit message or PR description. Exported doc comments stay one sentence.
+- Tool-owned comments stay: the Vite template URL in `frontend/vite.config.ts`, `eslint-disable` directives, `//go:` pragmas. Comment cleanup never deletes them.
 
 ## Testing
 
