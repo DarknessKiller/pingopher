@@ -19,7 +19,6 @@ import (
 
 const dnsQueryTimeout = 2 * time.Second
 
-// dnsRecord is one resolved address and the TTL the server attached to it.
 type dnsRecord struct {
 	IP  net.IP
 	TTL time.Duration
@@ -28,8 +27,7 @@ type dnsRecord struct {
 // resolveFunc performs one uncached lookup for host.
 type resolveFunc func(ctx context.Context, host string) ([]dnsRecord, error)
 
-// resolveFuncFor adapts a host's DNS setting into a resolveFunc. The nameserver
-// list is read lazily, so it is only touched on a cache miss.
+// resolveFuncFor reads the nameserver list lazily, so it is only touched on a cache miss.
 func resolveFuncFor(dns model.DNS) resolveFunc {
 	return func(ctx context.Context, host string) ([]dnsRecord, error) {
 		servers, network := nameServersFor(dns)
@@ -37,9 +35,7 @@ func resolveFuncFor(dns model.DNS) resolveFunc {
 	}
 }
 
-// nameServersFor returns the servers and transport to query for a host's DNS
-// setting. System DNS reads /etc/resolv.conf; a custom entry targets its own
-// configured address.
+// System DNS reads /etc/resolv.conf; a custom entry targets its own configured address.
 func nameServersFor(dns model.DNS) ([]string, string) {
 	network := strings.ToLower(dns.Protocol)
 	if network != "tcp" {
@@ -74,8 +70,7 @@ func systemNameServers() []string {
 	return servers
 }
 
-// resolveHost resolves host to addresses, following CNAME chains and carrying
-// each record's server-assigned TTL back to the caller.
+// resolveHost follows CNAME chains and carries each record's server-assigned TTL back to the caller.
 func resolveHost(ctx context.Context, servers []string, network, host string) ([]dnsRecord, error) {
 	if len(servers) == 0 {
 		return nil, errors.New("no DNS nameservers available")
@@ -162,8 +157,7 @@ func queryServer(ctx context.Context, server, network, host string, qtype dnsmes
 	return parseResponse(resp)
 }
 
-// exchange sends a raw DNS query. TCP is length-prefixed per RFC 1035; UDP is
-// not.
+// TCP answers are length-prefixed per RFC 1035; UDP answers are not.
 func exchange(ctx context.Context, server, network string, query []byte) ([]byte, error) {
 	dialer := net.Dialer{Timeout: dnsQueryTimeout}
 	conn, err := dialer.DialContext(ctx, network, server)
@@ -214,9 +208,8 @@ func truncated(resp []byte) bool {
 	return err == nil && header.Truncated
 }
 
-// parseResponse extracts A/AAAA addresses with their TTLs plus any CNAME in the
-// answer section. NXDOMAIN is reported as an empty, error-free answer so a
-// missing name falls through to the "no addresses" path.
+// NXDOMAIN is reported as an empty, error-free answer so a missing name falls through to the
+// "no addresses" path.
 func parseResponse(resp []byte) ([]dnsRecord, string, error) {
 	var parser dnsmessage.Parser
 	header, err := parser.Start(resp)

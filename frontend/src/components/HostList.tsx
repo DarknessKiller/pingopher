@@ -175,7 +175,6 @@ const HostList: React.FC = () => {
 
   return (
     <div>
-      {/* Header */}
       <div className="section-header">
         <div>
           <span className="mobile-brand">Pingopher</span>
@@ -184,7 +183,6 @@ const HostList: React.FC = () => {
         <ResponsiveButton icon={<PlusIcon size={16} />} text="Add Host" onClick={handleCreate} />
       </div>
 
-      {/* Desktop Table */}
       <div className="host-table-wrap">
         {loading ? (
           <div className="card" style={{ display: "flex", justifyContent: "center", padding: "var(--space-xl)" }}>
@@ -229,7 +227,6 @@ const HostList: React.FC = () => {
         )}
       </div>
 
-      {/* Mobile Cards */}
       <div className="host-cards">
         <div className="sort-bar">
           <select
@@ -272,7 +269,6 @@ const HostList: React.FC = () => {
         ))}
       </div>
 
-      {/* Edit/Create Modal */}
       <Modal
         open={isModalVisible}
         onClose={() => setIsModalVisible(false)}
@@ -285,7 +281,6 @@ const HostList: React.FC = () => {
         />
       </Modal>
 
-      {/* Detail Modal */}
       <Modal open={detailVisible} onClose={() => setDetailVisible(false)} title={`Details: ${selectedHost?.name ?? ""}`} width={900}>
         {selectedHost && (
           <Suspense fallback={<div style={{ textAlign: "center", padding: "var(--space-xl)" }}><div className="spinner spinner-lg" /></div>}>
@@ -294,7 +289,6 @@ const HostList: React.FC = () => {
         )}
       </Modal>
 
-      {/* Notification Modal */}
       <Modal open={notificationVisible} onClose={() => setNotificationVisible(false)} title={`Notifications: ${selectedHost?.name ?? ""}`} width={900}>
         {selectedHost && (
           <Suspense fallback={<div style={{ textAlign: "center", padding: "var(--space-xl)" }}><div className="spinner spinner-lg" /></div>}>
@@ -303,7 +297,6 @@ const HostList: React.FC = () => {
         )}
       </Modal>
 
-      {/* Delete Confirmation */}
       <ConfirmDialog
         open={!!confirmTarget}
         title="Are you sure?"

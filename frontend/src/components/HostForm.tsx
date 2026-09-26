@@ -232,7 +232,6 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
         </div>
       </div>
 
-      {/* DNS List */}
       <div className="mb-lg">
         <label className="form-label">DNS Servers</label>
         {(form.dns ?? []).map((entry, idx) => (

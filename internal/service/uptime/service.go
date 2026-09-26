@@ -20,9 +20,7 @@ import (
 	"resty.dev/v3"
 )
 
-// pingTimeout caps every monitor check when the caller hasn't provided a
-// tighter deadline. Previously the HTTP handler's on-demand ping had no
-// timeout at all and could hang on a stuck host.
+// pingTimeout caps a check when the caller sent no tighter deadline.
 const pingTimeout = 10 * time.Second
 
 type Service struct {
@@ -214,9 +212,7 @@ func (s *Service) makeRequestAndBuildHistory(ctx context.Context, host *model.Ho
 	}
 }
 
-// historyIsDown reports whether a single check failed for the host's protocol.
-// HTTP/S match against the accepted status codes; TCP/UDP/ping are binary
-// reachability checks where StatusCode 0 means the probe failed.
+// HTTP/S judge the accepted status codes; TCP/UDP/ping treat StatusCode 0 as a failed probe.
 func historyIsDown(host *model.Host, history *model.History) (bool, error) {
 	switch strings.ToLower(host.Protocol) {
 	case "http", "https":
@@ -230,8 +226,7 @@ func historyIsDown(host *model.Host, history *model.History) (bool, error) {
 func (s *Service) pingHTTP(ctx context.Context, host *model.Host, dns model.DNS) *model.History {
 	client := resty.New().SetTimeout(pingTimeout)
 
-	// Route HTTP dialing through the shared DNS cache instead of letting the
-	// transport re-resolve (and re-query) the host on every check.
+	// Dial through the shared DNS cache so the transport does not re-resolve per check.
 	if transport, err := client.HTTPTransport(); err == nil {
 		transport.DialContext = s.getDialer(dns).DialContext
 		client.SetTransport(transport)
@@ -304,9 +299,8 @@ func (s *Service) pingTCP(ctx context.Context, host *model.Host, dns model.DNS) 
 	}
 }
 
-// pingUDP sends a probe and waits for a reply. UDP is connectionless, so dial
-// alone can't prove reachability. For port 53 the probe is a DNS query; other
-// ports get raw bytes and any datagram back counts as alive.
+// UDP is connectionless, so dial alone proves nothing: port 53 gets a DNS query, other ports
+// get raw bytes and any datagram back counts as alive.
 // ponytail: quiet UDP services that never reply are flagged down even if alive;
 // switch to a protocol-aware probe if false downs matter.
 func (s *Service) pingUDP(ctx context.Context, host *model.Host, dns model.DNS) *model.History {
@@ -376,9 +370,7 @@ func targetAddr(host *model.Host) string {
 	return net.JoinHostPort(host.HostURL, strconv.Itoa(int(port)))
 }
 
-// cachingDialer resolves hostnames through the shared DNS cache, then dials the
-// resulting IPs. It backs TCP/UDP probes and the HTTP transport so a check
-// reuses a cached answer instead of querying the resolver on every run.
+// cachingDialer resolves through the shared DNS cache so probes reuse a cached answer.
 type cachingDialer struct {
 	service *Service
 	dns     model.DNS
@@ -423,8 +415,7 @@ func latencyMilliseconds(d time.Duration) uint16 {
 	return uint16((d + time.Millisecond - 1) / time.Millisecond)
 }
 
-// buildDNSQuery builds a minimal DNS query for the given domain and record
-// type. Common types: 1=A, 28=AAAA, 255=ANY.
+// Common qtypes: 1=A, 28=AAAA, 255=ANY.
 func buildDNSQuery(domain string, qtype uint16) []byte {
 	// Header: Transaction ID, Flags (standard query), 1 question, 0 answers
 	header := []byte{0xAA, 0xBB, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}

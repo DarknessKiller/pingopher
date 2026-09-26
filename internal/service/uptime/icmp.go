@@ -11,21 +11,17 @@ import (
 	probing "github.com/prometheus-community/pro-bing"
 )
 
-// pingICMP is the default ICMP prober. Tests swap it via SetPingFuncForTest.
 var pingICMP = defaultPingICMP
 
-// SetPingFuncForTest replaces the ICMP prober for the duration of a test.
 func SetPingFuncForTest(fn func(context.Context, string) (time.Duration, error)) {
 	pingICMP = fn
 }
 
-// ResetPingFuncForTest restores the real ICMP prober.
 func ResetPingFuncForTest() {
 	pingICMP = defaultPingICMP
 }
 
-// runPinger executes one echo request and reports latency. A run that sent
-// the request but got no reply is a timeout, not a socket error.
+// A run that sent the request but got no reply is a timeout, not a socket error.
 func runPinger(ctx context.Context, pinger *probing.Pinger) (time.Duration, error) {
 	err := pinger.RunWithContext(ctx)
 	if err != nil {
@@ -46,10 +42,8 @@ func isPermissionError(err error) bool {
 	return strings.Contains(msg, "permission denied") || strings.Contains(msg, "operation not permitted")
 }
 
-// defaultPingICMP probes target with a single ICMP echo request. It prefers the
-// privileged raw-socket path (root, or NET_RAW capability in Docker) and
-// falls back to the unprivileged datagram socket that Linux allows for
-// ping_group_range.
+// defaultPingICMP prefers the privileged raw-socket path (root, or NET_RAW in Docker) and
+// falls back to the unprivileged datagram socket Linux allows for ping_group_range.
 func defaultPingICMP(ctx context.Context, target string) (time.Duration, error) {
 	newPinger := func() (*probing.Pinger, error) {
 		p, err := probing.NewPinger(target)
@@ -75,7 +69,6 @@ func defaultPingICMP(ctx context.Context, target string) (time.Duration, error) 
 		return 0, privilegedErr
 	}
 
-	// Privileged path unavailable (no raw socket) — retry unprivileged.
 	up, err := newPinger()
 	if err != nil {
 		return 0, err
@@ -85,9 +78,8 @@ func defaultPingICMP(ctx context.Context, target string) (time.Duration, error) 
 	return runPinger(ctx, up)
 }
 
-// buildICMPHistory resolves the target (honoring a custom DNS resolver and the
-// shared DNS cache) and pings it. StatusCode 200 means a reply came back; 0
-// means it failed. ping is injectable so tests can avoid real sockets.
+// StatusCode 200 means a reply came back; 0 means it failed. ping is injectable so tests can
+// avoid real sockets.
 func (s *Service) buildICMPHistory(ctx context.Context, host *model.Host, dns model.DNS, ping func(context.Context, string) (time.Duration, error)) *model.History {
 	target, err := s.resolveICMPTarget(ctx, host.HostURL, dns)
 	if err != nil {
@@ -117,9 +109,8 @@ func (s *Service) buildICMPHistory(ctx context.Context, host *model.Host, dns mo
 	}
 }
 
-// resolveICMPTarget returns a literal IP, or resolves a hostname through the
-// configured DNS resolver (and shared cache) so multi-DNS monitoring applies
-// to ping targets too.
+// Resolve through the host's DNS setting and shared cache so multi-DNS monitoring applies to
+// ping targets too.
 func (s *Service) resolveICMPTarget(ctx context.Context, host string, dns model.DNS) (string, error) {
 	if ip := net.ParseIP(host); ip != nil {
 		return host, nil
@@ -136,8 +127,7 @@ func (s *Service) resolveICMPTarget(ctx context.Context, host string, dns model.
 	return ips[0].IP.String(), nil
 }
 
-// ipFamily returns a best-effort "4" or "6" for a host so pro-bing can pick
-// the matching socket. Empty means "default" (first resolved address).
+// Best-effort "4" or "6" so pro-bing picks the matching socket; empty means the first resolved address.
 func ipFamily(host string) string {
 	host = strings.Trim(host, "[]")
 	if ip := net.ParseIP(host); ip != nil {

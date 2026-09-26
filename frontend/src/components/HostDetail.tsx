@@ -114,7 +114,6 @@ const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
 
   return (
     <div>
-      {/* Stats */}
       <div className="stat-row">
         <div className="card card-sm">
           <div className="stat-card">
@@ -144,7 +143,6 @@ const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
         </div>
       </div>
 
-      {/* Chart */}
       <div className="chart-header">
         <h4>Latency History</h4>
         <select className="form-select" style={{ width: 200 }} value={range} onChange={(e) => setRange(e.target.value as typeof range)}>
@@ -171,7 +169,6 @@ const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
         <div ref={containerRef} style={{ height: "100%" }} />
       </div>
 
-      {/* Downtime Timeline */}
       {downtimes.length > 0 && (
         <div>
           <h4 style={{ marginBottom: "var(--space-md)", fontWeight: 600 }}>Downtime Events</h4>

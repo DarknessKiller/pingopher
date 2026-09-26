@@ -10,10 +10,8 @@ import (
 	"github.com/DarknessKiller/pingopher/internal/model"
 )
 
-// dnsCache reuses resolved addresses until the TTL the DNS server itself
-// supplied expires, so a monitor checking every few seconds doesn't re-query on
-// every check. Entries are keyed per resolver + hostname. Errors are never
-// cached, and a record with TTL 0 (server says "don't cache") is not stored.
+// dnsCache reuses addresses until the server-supplied TTL expires; entries are keyed per resolver +
+// hostname. Errors are never cached and TTL 0 records are not stored.
 type dnsCache struct {
 	mu      sync.Mutex
 	entries map[dnsKey]dnsEntry
@@ -33,9 +31,8 @@ func newDNSCache() *dnsCache {
 	return &dnsCache{entries: make(map[dnsKey]dnsEntry)}
 }
 
-// lookup resolves host, serving cached addresses while they remain within the
-// server-provided TTL. The whole answer set is bounded by its shortest record
-// TTL, matching how a normal resolver ages a response.
+// lookup serves cached addresses until their TTL expires; the whole answer set ages out on its
+// shortest record TTL, matching how a normal resolver ages a response.
 func (c *dnsCache) lookup(ctx context.Context, dns model.DNS, host string, resolve resolveFunc) ([]net.IPAddr, error) {
 	key := dnsKey{dns: dns, host: host}
 

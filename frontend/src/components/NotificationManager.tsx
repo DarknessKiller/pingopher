@@ -183,7 +183,6 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ host }) => {
         </div>
       )}
 
-      {/* Add/Edit Modal */}
       <Modal
         open={isModalVisible}
         onClose={() => setIsModalVisible(false)}
