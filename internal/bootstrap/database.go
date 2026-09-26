@@ -39,7 +39,6 @@ func InitiateDatabase(cfg *config.Config) *gorm.DB {
 	return db
 }
 
-// SQLite
 func InitiateSQLiteDatabase(cfg *config.Config) *gorm.DB {
 
 	db, err := gorm.Open(sqlite.Open(cfg.SQLitePath), &gorm.Config{})
@@ -51,7 +50,6 @@ func InitiateSQLiteDatabase(cfg *config.Config) *gorm.DB {
 	return db
 }
 
-// Cloudflare D1
 func InitiateD1Database(cfg *config.Config) *gorm.DB {
 	dsn := fmt.Sprintf("d1://%s:%s@%s",
 		cfg.CloudflareD1.AccountID,

@@ -16,7 +16,6 @@ import (
 	"github.com/segmentio/ksuid"
 )
 
-// MockHostRepository
 type MockHostRepository struct {
 	CreateFunc  func(ctx context.Context, host *model.Host) error
 	GetByIDFunc func(ctx context.Context, id string) (*model.Host, error)
@@ -60,7 +59,6 @@ func (m *MockHostRepository) Delete(ctx context.Context, id string) error {
 	return errors.New("mock DeleteFunc not implemented")
 }
 
-// MockHistoryRepository
 type MockHistoryRepository struct {
 	CreateFunc             func(ctx context.Context, history *model.History) error
 	GetByIDFunc            func(ctx context.Context, id string) (*model.History, error)
@@ -128,7 +126,6 @@ func (m *MockHistoryRepository) GetHistoryByHostID(ctx context.Context, hostID s
 	return nil, errors.New("mock GetHistoryByHostIDFunc not implemented")
 }
 
-// MockRedis
 type MockRedis struct {
 	GetFunc    func(ctx context.Context, key string, dest interface{}) error
 	SetFunc    func(ctx context.Context, key string, value interface{}, expiration time.Duration) error
@@ -239,7 +236,6 @@ func TestService_PingHost(t *testing.T) {
 	})
 
 	t.Run("Failure_Down", func(t *testing.T) {
-		// Create a server that returns 500
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 		}))

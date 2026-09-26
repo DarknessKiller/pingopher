@@ -8,7 +8,7 @@ A self-hosted uptime monitoring tool with **multi-DNS support** — ping a singl
 - **Multiple protocols** — monitor HTTP(S) sites, TCP/UDP services, and ICMP ping targets (IPv4 and IPv6) with configurable intervals per host
 - **Scheduled health checks** — cron-based pings with configurable intervals per host
 - **Dynamic backoff** — automatically reduces check frequency when a host is down, using exponential backoff up to a configurable max interval
-- **Status change detection** — detects up→down and down→up transitions, re-sending notifications on every change
+- **Status change detection** — detects up→down and down→up transitions and alerts on each change, throttled to one alert per host and direction every 15 minutes
 - **Repeated failure alerts** — re-notifies after N consecutive failures (configurable threshold)
 - **Latency charting** — visualize latency over time with G2Plot line charts, broken down by DNS resolver
 - **Downtime timeline** — view incident events with duration, DNS resolver, and error details
@@ -99,6 +99,7 @@ Configure via environment variables in `.env`:
 | `PINGOPHER_REDIS_PORT`          | `6379`               | Redis port                               |
 | `PINGOPHER_REDIS_PASSWORD`      |                      | Redis password                           |
 | `PINGOPHER_MAX_RETRY_INTERVAL`  | `900`                | Max backoff interval (seconds) when down  |
+| `PINGOPHER_NOTIFICATION_COOLDOWN` | `900`                | Min seconds between alerts per host and direction |
 
 Cloudflare D1 requires additional `PINGOPHER_CF_D1_*` variables (account ID, auth token, database string).
 

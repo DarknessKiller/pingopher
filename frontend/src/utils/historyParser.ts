@@ -79,10 +79,8 @@ export const processHistoryResults = (results: Result[], host: Host): ProcessedH
     return { dnsColors: {}, downtimes: [], parsed: [], uptimePercent: 100 };
   }
 
-  // Ensure chronological order
   results.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
-  // Assign colors dynamically
   const dnsNames = Array.from(new Set(results.map(r => r.dns || "System DNS"))).sort();
   const colorMap: Record<string, string> = {};
   dnsNames.forEach((n, i) => {
@@ -95,7 +93,6 @@ export const processHistoryResults = (results: Result[], host: Host): ProcessedH
     downMap.set(r, isResultDown(r, host.acceptedStatusCodes, host.protocol));
   }
 
-  // Group by DNS
   const resultsByDns: Record<string, Result[]> = {};
   for (const r of results) {
     const key = r.dns || "System DNS";

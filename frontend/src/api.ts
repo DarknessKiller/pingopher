@@ -86,7 +86,6 @@ export interface CreateNotificationRequest {
 
 export type UpdateNotificationRequest = Partial<CreateNotificationRequest>;
 
-// New required signal type for GET requests
 type GetRequestConfig = AxiosRequestConfig & { signal: AbortSignal };
 
 const api = axios.create({

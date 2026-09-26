@@ -13,8 +13,7 @@ type ToModel[M any] interface {
 	ToModel() *M
 }
 
-// Validatable is implemented by DTOs that need cross-field validation beyond
-// struct tags (e.g. protocol-dependent required fields).
+// Validatable marks DTOs that need cross-field validation, e.g. protocol-dependent required fields.
 type Validatable interface {
 	Validate() error
 }

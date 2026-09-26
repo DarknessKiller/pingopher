@@ -39,7 +39,7 @@ func New() *Bootstrap {
 	bs.HistoryRepository = repository.NewHistoryRepository(bs.Database)
 	bs.NotificationRepository = repository.NewNotificationRepository(bs.Database)
 	bs.UptimeService = uptime.NewService(bs.Config, bs.HostRepository, bs.HistoryRepository, cache)
-	bs.NotificationService = notification.NewService(bs.HostRepository, bs.NotificationRepository, cache)
+	bs.NotificationService = notification.NewService(bs.Config, bs.HostRepository, bs.NotificationRepository, cache)
 	bs.UptimeScheduler = uptime.NewScheduler(bs.UptimeService, bs.NotificationService)
 	return bs
 }

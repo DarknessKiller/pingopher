@@ -30,6 +30,9 @@ type Config struct {
 
 	// Scheduler
 	MaxRetryInterval int
+
+	// Notifications
+	NotificationCooldown int
 }
 
 func Load() (*Config, error) {
@@ -42,9 +45,18 @@ func Load() (*Config, error) {
 	}
 
 	maxRetryInterval := 900
-	if os.Getenv("PINGOPHER_MAX_RETRY_INTERVAL") != "" {
+	if maxRetryEnv := os.Getenv("PINGOPHER_MAX_RETRY_INTERVAL"); maxRetryEnv != "" {
 		var err error
-		maxRetryInterval, err = strconv.Atoi(os.Getenv("PINGOPHER_MAX_RETRY_INTERVAL"))
+		maxRetryInterval, err = strconv.Atoi(maxRetryEnv)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	notificationCooldown := 900
+	if cooldownEnv := os.Getenv("PINGOPHER_NOTIFICATION_COOLDOWN"); cooldownEnv != "" {
+		var err error
+		notificationCooldown, err = strconv.Atoi(cooldownEnv)
 		if err != nil {
 			return nil, err
 		}
@@ -64,7 +76,8 @@ func Load() (*Config, error) {
 			AuthToken:      os.Getenv("PINGOPHER_CF_D1_AUTH_TOKEN"),
 			DatabaseString: os.Getenv("PINGOPHER_CF_D1_DATABASE_STRING"),
 		},
-		MaxRetryInterval: maxRetryInterval,
+		MaxRetryInterval:     maxRetryInterval,
+		NotificationCooldown: notificationCooldown,
 	}
 
 	return cfg, nil

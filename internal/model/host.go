@@ -37,8 +37,7 @@ type Host struct {
 	History []History `gorm:"foreignKey:HostID;references:ID;-:migration;->"`
 }
 
-// DisplayURL renders a human-readable target for the host's protocol:
-// http(s)://host[:port], host:port for tcp/udp, and just host for ping.
+// DisplayURL renders the protocol's target: http(s)://host[:port], host:port for tcp/udp, host for ping.
 func (h Host) DisplayURL() string {
 	hostPort := h.HostURL
 	if h.Port != nil && *h.Port != 0 {

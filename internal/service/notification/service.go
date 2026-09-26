@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/DarknessKiller/pingopher/internal/cache"
+	"github.com/DarknessKiller/pingopher/internal/config"
 	"github.com/DarknessKiller/pingopher/internal/model"
 	"github.com/DarknessKiller/pingopher/internal/notification/discord"
 	"github.com/DarknessKiller/pingopher/internal/repository"
@@ -15,10 +17,19 @@ import (
 type NotificationService struct {
 	repository Repository
 	cache      cache.Cache
+
+	cooldown  time.Duration
+	mu        sync.Mutex
+	lastFired map[string]time.Time
 }
 
-func NewService(hostRepository *repository.BaseRepository[model.Host], historyRepo repository.NotificationRepository, cacheClient cache.Cache) *NotificationService {
-	return &NotificationService{repository: &newRepository{HostRepo: hostRepository, NotificationRepo: historyRepo}, cache: cacheClient}
+func NewService(config *config.Config, hostRepository *repository.BaseRepository[model.Host], historyRepo repository.NotificationRepository, cacheClient cache.Cache) *NotificationService {
+	return &NotificationService{
+		repository: &newRepository{HostRepo: hostRepository, NotificationRepo: historyRepo},
+		cache:      cacheClient,
+		cooldown:   time.Duration(config.NotificationCooldown) * time.Second,
+		lastFired:  make(map[string]time.Time),
+	}
 }
 
 func (ns *NotificationService) CreateNotification(ctx context.Context, hostId string, notification *model.Notification) error {
@@ -91,8 +102,27 @@ func (ns *NotificationService) UpdateNotification(ctx context.Context, hostId, n
 	return err
 }
 
+func (ns *NotificationService) allowFire(hostID string, status model.HostStatus) bool {
+	key := hostID + ":" + string(status)
+
+	ns.mu.Lock()
+	defer ns.mu.Unlock()
+
+	if last, ok := ns.lastFired[key]; ok && time.Since(last) < ns.cooldown {
+		return false
+	}
+
+	ns.lastFired[key] = time.Now()
+	return true
+}
+
 func (ns *NotificationService) SendNotification(host *model.Host, histories []*model.History) {
 	ctx := context.Background()
+	if !ns.allowFire(host.ID.String(), host.Status) {
+		log.Printf("[%s] notification suppressed: %s cooldown", host.HostURL, ns.cooldown)
+		return
+	}
+
 	cacheKey := "pingopher_active_notifications:" + host.ID.String()
 	var notifications []model.Notification
 	if err := ns.cache.Get(ctx, cacheKey, &notifications); err != nil {
