@@ -18,9 +18,6 @@ type NotificationService struct {
 	repository Repository
 	cache      cache.Cache
 
-	// cooldown caps alert sends per host and direction. Without it a flapping
-	// or long-down host fires a webhook, and a D1 write for lastNotifiedAt, on
-	// every single check.
 	cooldown  time.Duration
 	mu        sync.Mutex
 	lastFired map[string]time.Time
@@ -105,9 +102,6 @@ func (ns *NotificationService) UpdateNotification(ctx context.Context, hostId, n
 	return err
 }
 
-// allowFire reports whether an alert for this host and status may go out now,
-// and records the fire. Down and up keep separate buckets, so a throttled
-// down alert never swallows the recovery alert.
 func (ns *NotificationService) allowFire(hostID string, status model.HostStatus) bool {
 	key := hostID + ":" + string(status)
 
