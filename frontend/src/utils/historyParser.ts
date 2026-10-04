@@ -1,4 +1,4 @@
-import { type Host, type Result } from "../api";
+import type { Host, Result } from "../api";
 
 
 export interface ParsedHistory {
@@ -167,6 +167,7 @@ export const processHistoryResults = (results: Result[], host: Host): ProcessedH
     const rounds = new Map<string, boolean>();
     for (const r of results) {
       const isFailed = downMap.get(r)!;
+      // One failed round per round: a second resolver failing in the same round must not shrink the SLA twice.
       rounds.set(r.timestamp, (rounds.get(r.timestamp) ?? true) && !isFailed);
     }
     let failedRounds = 0;

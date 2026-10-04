@@ -34,11 +34,17 @@ func ToHistories(histories []*model.History) Histories {
 			dnsName = "System DNS"
 		}
 
+		// Every resolver checked in one round shares PingDateTime, so the SLA groups the round once.
+		timestamp := history.CreatedAt
+		if history.PingDateTime.Valid {
+			timestamp = history.PingDateTime.Time
+		}
+
 		results[i] = Result{
 			DNS:        dnsName,
 			StatusCode: history.StatusCode,
 			Latency:    fmt.Sprintf("%d ms", history.Latency),
-			Timestamp:  history.CreatedAt,
+			Timestamp:  timestamp,
 			ErrorMsg:   history.ErrorMessage,
 		}
 	}
