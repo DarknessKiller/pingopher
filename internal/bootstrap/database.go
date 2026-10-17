@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/DarknessKiller/pingopher/internal/config"
 	"github.com/DarknessKiller/pingopher/internal/model"
@@ -41,7 +42,7 @@ func InitiateDatabase(cfg *config.Config) *gorm.DB {
 
 func InitiateSQLiteDatabase(cfg *config.Config) *gorm.DB {
 
-	db, err := gorm.Open(sqlite.Open(cfg.SQLitePath), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(sqliteDSN(cfg.SQLitePath)), &gorm.Config{})
 	if err != nil {
 		log.Fatal("Failed to connect to SQLite:", err)
 	}
@@ -63,4 +64,14 @@ func InitiateD1Database(cfg *config.Config) *gorm.DB {
 
 	log.Println("D1 connected! Database:", cfg.CloudflareD1.DatabaseString)
 	return gormDB
+}
+
+// sqliteDSN appends the durability pragmas used for concurrent probe writes: WAL lets readers work
+// during a write, NORMAL sync keeps commits cheap. busy_timeout(5000) is added by the driver itself.
+func sqliteDSN(path string) string {
+	sep := "?"
+	if strings.Contains(path, "?") {
+		sep = "&"
+	}
+	return path + sep + "_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)"
 }
