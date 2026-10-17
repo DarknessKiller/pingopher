@@ -328,3 +328,21 @@ func TestService_PingHost(t *testing.T) {
 		}
 	})
 }
+
+func TestService_HTTPClientReuse(t *testing.T) {
+	sys := model.DNS{Name: "System DNS"}
+	other := model.DNS{Name: "1.1.1.1"}
+
+	svc := &uptime.Service{}
+	uptime.InitHTTPClients(svc)
+	first := uptime.ClientForHTTP(svc, sys, false)
+	if uptime.ClientForHTTP(svc, sys, false) != first {
+		t.Error("same dns+secure should return the same client")
+	}
+	if uptime.ClientForHTTP(svc, sys, true) == first {
+		t.Error("insecure variant must be a separate client")
+	}
+	if uptime.ClientForHTTP(svc, other, false) == first {
+		t.Error("other resolver must be a separate client")
+	}
+}
