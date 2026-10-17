@@ -28,15 +28,28 @@ type Service struct {
 	repository Repository
 	cache      cache.Cache
 	dnsCache   *dnsCache
+
+	httpMu sync.Mutex
+	// Shared clients keep TCP/TLS connections alive across probes; a per-probe client costs a full handshake.
+	httpClients map[httpClientKey]*resty.Client
+}
+
+// httpClientKey separates clients by pinned resolver (per-DNS dialer) and TLS verify mode, the two
+// per-host settings endpoints share one pool.
+type httpClientKey struct {
+	dns      model.DNS
+	insecure bool
 }
 
 func NewService(config *config.Config, hostRepository repository.HostRepository, historyRepository repository.HistoryRepository, cacheClient cache.Cache) *Service {
 	return &Service{
-		config:     config,
-		repository: &newRepository{HostRepo: hostRepository, HistoryRepo: historyRepository},
-		cache:      cacheClient,
-		dnsCache:   newDNSCache(),
+		config:      config,
+		repository:  &newRepository{HostRepo: hostRepository, HistoryRepo: historyRepository},
+		cache:       cacheClient,
+		dnsCache:    newDNSCache(),
+		httpClients: make(map[httpClientKey]*resty.Client),
 	}
+
 }
 
 func (s *Service) CreateHost(ctx context.Context, host *model.Host) error {
@@ -224,29 +237,12 @@ func historyIsDown(host *model.Host, history *model.History) (bool, error) {
 }
 
 func (s *Service) pingHTTP(ctx context.Context, host *model.Host, dns model.DNS) *model.History {
-	client := resty.New().SetTimeout(pingTimeout)
-
-	// Dial through the shared DNS cache so the transport does not re-resolve per check.
-	if transport, err := client.HTTPTransport(); err == nil {
-		transport.DialContext = s.getDialer(dns).DialContext
-		client.SetTransport(transport)
-	}
-
-	userAgent := "Pingopher/Alpha (https://github.com/DarknessKiller/pingopher)"
-	client.SetHeader("User-Agent", userAgent).
-		SetDebug(s.config.Env != "production")
-
-	defer client.Close()
-
+	insecure := host.TLS.NoVerify != nil && *host.TLS.NoVerify
+	client := s.httpClient(dns, insecure)
 	hostURL := strings.ToLower(host.Protocol) + "://" + host.HostURL
 	if host.Port != nil && *host.Port != 0 {
 		hostURL = strings.ToLower(host.Protocol) + "://" + net.JoinHostPort(host.HostURL, strconv.Itoa(int(*host.Port)))
 	}
-
-	if host.TLS.NoVerify != nil && *host.TLS.NoVerify {
-		client.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true})
-	}
-
 	var errorMsg string
 	resp, err := client.R().WithContext(ctx).Get(hostURL)
 	switch err.(type) {
@@ -273,6 +269,34 @@ func (s *Service) pingHTTP(ctx context.Context, host *model.Host, dns model.DNS)
 		ErrorMessage: errorMsg,
 	}
 }
+
+// httpClient returns a long-lived client for a (resolver, TLS verify) pair. First call wires the
+// per-DNS dialer and TLS mode; later probes reuse the pooled connections without re-resolving.
+func (s *Service) httpClient(dns model.DNS, insecure bool) *resty.Client {
+	s.httpMu.Lock()
+	defer s.httpMu.Unlock()
+
+	key := httpClientKey{dns: dns, insecure: insecure}
+	if client, ok := s.httpClients[key]; ok {
+		return client
+	}
+
+	client := resty.New().SetTimeout(pingTimeout)
+	if transport, err := client.HTTPTransport(); err == nil {
+		transport.DialContext = s.getDialer(dns).DialContext
+		client.SetTransport(transport)
+	}
+	if insecure {
+		client.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+	}
+	client.SetHeader("User-Agent", "Pingopher/Alpha (https://github.com/DarknessKiller/pingopher)").
+		SetDebug(s.config != nil && s.config.Env != "production")
+
+	s.httpClients[key] = client
+	return client
+}
+
+
 
 func (s *Service) pingTCP(ctx context.Context, host *model.Host, dns model.DNS) *model.History {
 	target := targetAddr(host)
