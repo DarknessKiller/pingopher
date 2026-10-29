@@ -67,3 +67,8 @@ test("a round with every resolver up stays up", () => {
   );
   assert.equal(uptimePercent, 66.67);
 });
+test("a gap after a failed sample is not counted as downtime", () => {
+  const { downtimes } = processHistoryResults([result("a", "2026-01-01T00:00:00Z", true)], host);
+  assert.equal(downtimes.length, 1);
+  assert.equal(downtimes[0].durationString, "1m 0s (Ongoing)");
+});
