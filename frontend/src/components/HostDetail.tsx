@@ -145,7 +145,7 @@ const HostDetail: React.FC<HostDetailProps> = ({ host }) => {
 
       <div className="chart-header">
         <h4>Latency History</h4>
-        <select className="form-select" style={{ width: 200 }} value={range} onChange={(e) => setRange(e.target.value as typeof range)}>
+        <select className="form-select" value={range} onChange={(e) => setRange(e.target.value as typeof range)}>
           {TIME_RANGES.map((r) => (
             <option key={r.value} value={r.value}>{r.label}</option>
           ))}
