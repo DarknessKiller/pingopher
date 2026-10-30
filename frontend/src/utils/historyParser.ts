@@ -135,8 +135,6 @@ export const processHistoryResults = (results: Result[], host: Host): ProcessedH
     }
 
     if (currentDowntime) {
-      const durationMs = Date.now() - currentDowntime.start.getTime();
-      currentDowntime.durationString = `${formatDuration(durationMs)} (Ongoing)`;
       rawDowntimes.push(currentDowntime);
     }
   }
@@ -160,6 +158,16 @@ export const processHistoryResults = (results: Result[], host: Host): ProcessedH
       }
     }
     newDowntimes.push(dt);
+  }
+
+  // A gap in the samples is not downtime: an open event may stretch at most one interval past its
+  // last sample, or a monitor outage after a single failure renders as hours of downtime.
+  const lastSampleMs = new Date(results[results.length - 1].timestamp).getTime();
+  const openEndMs = Math.min(Date.now(), lastSampleMs + (host.pingInterval || 60) * 1000);
+  for (const dt of newDowntimes) {
+    if (dt.end === null) {
+      dt.durationString = `${formatDuration(openEndMs - dt.start.getTime())} (Ongoing)`;
+    }
   }
 
   let uptimePercent = 100;

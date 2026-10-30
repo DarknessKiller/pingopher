@@ -80,7 +80,10 @@ func defaultPingICMP(ctx context.Context, target string) (time.Duration, error) 
 
 // StatusCode 200 means a reply came back; 0 means it failed. ping is injectable so tests can
 // avoid real sockets.
-func (s *Service) buildICMPHistory(ctx context.Context, host *model.Host, dns model.DNS, ping func(context.Context, string) (time.Duration, error)) *model.History {
+func (s *Service) buildICMPHistory(ctx context.Context, host *model.Host, dns model.DNS, ping func(context.Context, string) (time.Duration, error)) (*model.History, error) {
+	if err := beforeProbe(ctx); err != nil {
+		return nil, err
+	}
 	target, err := s.resolveICMPTarget(ctx, host.HostURL, dns)
 	if err != nil {
 		return &model.History{
@@ -88,7 +91,7 @@ func (s *Service) buildICMPHistory(ctx context.Context, host *model.Host, dns mo
 			HostID:       host.ID,
 			DNS:          dns,
 			ErrorMessage: err.Error(),
-		}
+		}, nil
 	}
 
 	latency, err := ping(ctx, target)
@@ -98,7 +101,7 @@ func (s *Service) buildICMPHistory(ctx context.Context, host *model.Host, dns mo
 			HostID:       host.ID,
 			DNS:          dns,
 			ErrorMessage: err.Error(),
-		}
+		}, nil
 	}
 
 	return &model.History{
@@ -106,7 +109,7 @@ func (s *Service) buildICMPHistory(ctx context.Context, host *model.Host, dns mo
 		Latency:    latencyMilliseconds(latency),
 		HostID:     host.ID,
 		DNS:        dns,
-	}
+	}, nil
 }
 
 // Resolve through the host's DNS setting and shared cache so multi-DNS monitoring applies to

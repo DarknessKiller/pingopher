@@ -165,13 +165,22 @@ func (s *Service) PingHost(ctx context.Context, hostID string) (prevStatus model
 	pingTime := time.Now()
 
 	histories = make([]*model.History, len(dnsList))
+	var probeErr error
 
 	for i, dns := range dnsList {
 		wg.Add(1)
 		go func(i int, dns model.DNS) {
 			defer wg.Done()
 
-			history := s.makeRequestAndBuildHistory(ctx, host, dns)
+			history, err := s.makeRequestAndBuildHistory(ctx, host, dns)
+			if err != nil {
+				mutex.Lock()
+				if probeErr == nil {
+					probeErr = err
+				}
+				mutex.Unlock()
+				return
+			}
 			history.PingDateTime = sql.NullTime{Time: pingTime, Valid: true}
 
 			mutex.Lock()
@@ -181,6 +190,18 @@ func (s *Service) PingHost(ctx context.Context, hostID string) (prevStatus model
 	}
 
 	wg.Wait()
+
+	conclusive := make([]*model.History, 0, len(histories))
+	for _, history := range histories {
+		if history != nil {
+			conclusive = append(conclusive, history)
+		}
+	}
+	histories = conclusive
+	if len(histories) == 0 {
+		// No probe reached the network, so nothing is known about the host.
+		return "", nil, nil, probeErr
+	}
 
 	anyDown := false
 	for _, history := range histories {
@@ -200,19 +221,33 @@ func (s *Service) PingHost(ctx context.Context, hostID string) (prevStatus model
 		host.Status = model.HostStatusUp
 	}
 
+	// The probe and the write get separate budgets: a round that spent its whole deadline must
+	// still persist its result, or the outage it saw leaves no trace.
+	writeCtx, cancelWrite := context.WithTimeout(context.WithoutCancel(ctx), pingTimeout)
+	defer cancelWrite()
+
 	if prevStatus != host.Status {
-		_ = s.cache.Set(ctx, cacheKey, host, 24*time.Hour)
-		_ = s.cache.Delete(ctx, "pingopher_hosts:all")
+		_ = s.cache.Set(writeCtx, cacheKey, host, 24*time.Hour)
+		_ = s.cache.Delete(writeCtx, "pingopher_hosts:all")
 	}
 
-	if histories, err = s.repository.History().CreatePingHistory(ctx, prevStatus, host, histories); err != nil {
+	if histories, err = s.repository.History().CreatePingHistory(writeCtx, prevStatus, host, histories); err != nil {
 		return prevStatus, host, histories, err
 	}
 
 	return prevStatus, host, histories, nil
 }
 
-func (s *Service) makeRequestAndBuildHistory(ctx context.Context, host *model.Host, dns model.DNS) *model.History {
+// beforeProbe fails a round whose budget is spent: nothing reached the network, so the host
+// produced no evidence and the result must not count as down.
+func beforeProbe(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return fmt.Errorf("no probe sent: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) makeRequestAndBuildHistory(ctx context.Context, host *model.Host, dns model.DNS) (*model.History, error) {
 	switch strings.ToLower(host.Protocol) {
 	case "tcp":
 		return s.pingTCP(ctx, host, dns)
@@ -226,6 +261,7 @@ func (s *Service) makeRequestAndBuildHistory(ctx context.Context, host *model.Ho
 }
 
 // HTTP/S judge the accepted status codes; TCP/UDP/ping treat StatusCode 0 as a failed probe.
+// Only conclusive probes reach here — a round that sent nothing is dropped in PingHost.
 func historyIsDown(host *model.Host, history *model.History) (bool, error) {
 	switch strings.ToLower(host.Protocol) {
 	case "http", "https":
@@ -236,7 +272,10 @@ func historyIsDown(host *model.Host, history *model.History) (bool, error) {
 	}
 }
 
-func (s *Service) pingHTTP(ctx context.Context, host *model.Host, dns model.DNS) *model.History {
+func (s *Service) pingHTTP(ctx context.Context, host *model.Host, dns model.DNS) (*model.History, error) {
+	if err := beforeProbe(ctx); err != nil {
+		return nil, err
+	}
 	insecure := host.TLS.NoVerify != nil && *host.TLS.NoVerify
 	client := s.httpClient(dns, insecure)
 	hostURL := strings.ToLower(host.Protocol) + "://" + host.HostURL
@@ -267,7 +306,7 @@ func (s *Service) pingHTTP(ctx context.Context, host *model.Host, dns model.DNS)
 		HostID:       host.ID,
 		DNS:          dns,
 		ErrorMessage: errorMsg,
-	}
+	}, nil
 }
 
 // httpClient returns a long-lived client for a (resolver, TLS verify) pair. First call wires the
@@ -298,7 +337,10 @@ func (s *Service) httpClient(dns model.DNS, insecure bool) *resty.Client {
 
 
 
-func (s *Service) pingTCP(ctx context.Context, host *model.Host, dns model.DNS) *model.History {
+func (s *Service) pingTCP(ctx context.Context, host *model.Host, dns model.DNS) (*model.History, error) {
+	if err := beforeProbe(ctx); err != nil {
+		return nil, err
+	}
 	target := targetAddr(host)
 
 	start := time.Now()
@@ -320,14 +362,17 @@ func (s *Service) pingTCP(ctx context.Context, host *model.Host, dns model.DNS) 
 		HostID:       host.ID,
 		DNS:          dns,
 		ErrorMessage: errorMsg,
-	}
+	}, nil
 }
 
 // UDP is connectionless, so dial alone proves nothing: port 53 gets a DNS query, other ports
 // get raw bytes and any datagram back counts as alive.
 // ponytail: quiet UDP services that never reply are flagged down even if alive;
 // switch to a protocol-aware probe if false downs matter.
-func (s *Service) pingUDP(ctx context.Context, host *model.Host, dns model.DNS) *model.History {
+func (s *Service) pingUDP(ctx context.Context, host *model.Host, dns model.DNS) (*model.History, error) {
+	if err := beforeProbe(ctx); err != nil {
+		return nil, err
+	}
 	target := targetAddr(host)
 
 	start := time.Now()
@@ -339,7 +384,7 @@ func (s *Service) pingUDP(ctx context.Context, host *model.Host, dns model.DNS) 
 			HostID:       host.ID,
 			DNS:          dns,
 			ErrorMessage: err.Error(),
-		}
+		}, nil
 	}
 	defer conn.Close()
 
@@ -355,7 +400,7 @@ func (s *Service) pingUDP(ctx context.Context, host *model.Host, dns model.DNS) 
 			HostID:       host.ID,
 			DNS:          dns,
 			ErrorMessage: err.Error(),
-		}
+		}, nil
 	}
 
 	if deadline, ok := ctx.Deadline(); ok {
@@ -375,7 +420,7 @@ func (s *Service) pingUDP(ctx context.Context, host *model.Host, dns model.DNS) 
 			HostID:       host.ID,
 			DNS:          dns,
 			ErrorMessage: err.Error(),
-		}
+		}, nil
 	}
 
 	return &model.History{
@@ -383,7 +428,7 @@ func (s *Service) pingUDP(ctx context.Context, host *model.Host, dns model.DNS) 
 		Latency:    latencyMilliseconds(time.Since(start)),
 		HostID:     host.ID,
 		DNS:        dns,
-	}
+	}, nil
 }
 
 func targetAddr(host *model.Host) string {
