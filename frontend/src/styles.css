@@ -15,12 +15,16 @@ html {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: var(--bg-secondary);
+  background-image: var(--bg-ambient);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  overscroll-behavior: none;
+  transition: background-color 300ms ease;
 }
-
 body {
-  background: var(--bg-secondary);
   color: var(--text-primary);
-  transition: background-color 300ms ease, color 300ms ease;
+  transition: color 300ms ease;
   min-height: 100vh;
 }
 
@@ -80,6 +84,7 @@ a:hover { text-decoration: underline; }
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     border-right: 1px solid var(--glass-border);
+    box-shadow: inset 0 1px 0 var(--glass-highlight), inset -1px 0 0 var(--glass-ring);
     z-index: 100;
     padding: var(--space-lg) 0;
   }
@@ -156,6 +161,7 @@ a:hover { text-decoration: underline; }
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border-top: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), inset 0 -1px 0 var(--glass-ring);
   z-index: 100;
   align-items: center;
   justify-content: space-around;
@@ -240,12 +246,13 @@ a:hover { text-decoration: underline; }
 
 /* ── Cards ── */
 .card {
-  background: var(--bg-card);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-card);
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 0 0 1px var(--glass-ring), var(--shadow-card);
   padding: var(--space-lg);
-  transition: background-color 300ms ease, border-color 300ms ease;
 }
 
 .card-sm {
@@ -280,9 +287,10 @@ a:hover { text-decoration: underline; }
 }
 
 .btn-primary {
-  background: var(--accent);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0)), var(--accent);
   color: #fff;
-  border-color: var(--accent);
+  border-color: transparent;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12), 0 8px 20px -10px rgba(0, 122, 255, 0.8);
 }
 
 .btn-primary:hover {
@@ -346,10 +354,12 @@ a:hover { text-decoration: underline; }
 /* ── Table ── */
 .table-container {
   overflow-x: auto;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 0 0 1px var(--glass-ring), var(--shadow-card);
 }
 
 .table {
@@ -504,8 +514,33 @@ a:hover { text-decoration: underline; }
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
 }
 
+/* Own chevron instead of the UA one, so it can never fall outside the field */
+.form-select {
+  appearance: none;
+  -webkit-appearance: none;
+  max-width: 100%;
+  min-width: 0;
+  padding-right: 2rem;
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 11px 7px;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
 .form-input::placeholder {
   color: var(--text-tertiary);
+}
+/* Numbers are typed, not spun: hide the UA steppers */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
 }
 
 .form-grid {
@@ -568,8 +603,9 @@ a:hover { text-decoration: underline; }
   align-items: center;
   gap: 4px;
   padding: 2px 8px;
-  background: var(--accent);
-  color: #fff;
+  background: rgba(0, 122, 255, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(0, 122, 255, 0.25);
   border-radius: var(--radius-full);
   font-size: 0.8125rem;
 }
@@ -577,7 +613,8 @@ a:hover { text-decoration: underline; }
 .chip-remove {
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.7);
+  color: currentColor;
+  opacity: 0.6;
   cursor: pointer;
   padding: 0;
   font-size: 0.875rem;
@@ -585,7 +622,25 @@ a:hover { text-decoration: underline; }
 }
 
 .chip-remove:hover {
-  color: #fff;
+  opacity: 1;
+}
+
+/* Status-code colours, shared by the chips and the suggestion buttons */
+.code-2 { background: rgba(52, 199, 89, 0.12); color: var(--success); border-color: rgba(52, 199, 89, 0.25); }
+.code-3 { background: rgba(0, 122, 255, 0.12); color: var(--accent); border-color: rgba(0, 122, 255, 0.25); }
+.code-4 { background: rgba(255, 149, 0, 0.12); color: var(--warning); border-color: rgba(255, 149, 0, 0.25); }
+.code-5 { background: rgba(255, 59, 48, 0.12); color: var(--danger); border-color: rgba(255, 59, 48, 0.25); }
+.code-btn {
+  padding: 2px 10px;
+  border: 1px solid;
+  border-radius: var(--radius-full);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: filter var(--transition-fast);
+}
+.code-btn:hover {
+  filter: brightness(0.96);
 }
 
 .chip-input {
@@ -621,14 +676,19 @@ a:hover { text-decoration: underline; }
 }
 
 .modal-content {
-  background: var(--bg-card);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-modal);
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 0 0 1px var(--glass-ring), var(--shadow-modal);
   width: 100%;
   max-width: 520px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  overscroll-behavior: contain;
   transform: scale(0.95);
   animation: modalScaleIn 250ms cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
@@ -673,6 +733,39 @@ a:hover { text-decoration: underline; }
   border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
+/* Form body scrolls; the submit bar is a flex sibling, so it cannot scroll away.
+   Flex sizing, not height: 100% — .modal-body has no definite computed height. */
+.modal-body:has(> .modal-form) {
+  display: flex;
+  flex-direction: column;
+}
+.modal-form {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.modal-form-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 calc(-1 * var(--space-lg));
+  padding: 0 var(--space-lg) var(--space-md);
+}
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+  margin: 0 calc(-1 * var(--space-lg)) calc(-1 * var(--space-lg));
+  padding: var(--space-md) var(--space-lg) var(--space-lg);
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-top: 1px solid var(--glass-border);
+  box-shadow: 0 -10px 20px -16px rgba(0, 0, 0, 0.25);
+}
+
 
 @keyframes modalFadeIn {
   from { opacity: 0; }
@@ -696,9 +789,12 @@ a:hover { text-decoration: underline; }
 
 /* ── Confirm Dialog (Apple alert style) ── */
 .confirm-dialog {
-  background: var(--bg-card);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-modal);
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 0 0 1px var(--glass-ring), var(--shadow-modal);
   width: 100%;
   max-width: 320px;
   overflow: hidden;
@@ -791,7 +887,7 @@ a:hover { text-decoration: underline; }
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow-elevated);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 0 0 1px var(--glass-ring), var(--shadow-elevated);
   font-size: 0.875rem;
   font-weight: 500;
   white-space: nowrap;
@@ -1000,10 +1096,12 @@ a:hover { text-decoration: underline; }
 /* ── Chart Container ── */
 .chart-container {
   position: relative;
-  background: var(--bg-card);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-card);
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 0 0 1px var(--glass-ring), var(--shadow-card);
   padding: var(--space-md);
   margin-bottom: var(--space-lg);
   height: 400px;
@@ -1028,6 +1126,10 @@ a:hover { text-decoration: underline; }
 .chart-header h4 {
   font-size: 1rem;
   font-weight: 600;
+}
+.chart-header .form-select {
+  width: auto;
+  min-width: 160px;
 }
 
 /* g2plot dark mode overrides */
@@ -1166,3 +1268,24 @@ details .details-body {
 .text-secondary { color: var(--text-secondary); }
 .text-right { text-align: right; }
 .w-full { width: 100%; }
+
+/* Glass needs an opaque fallback where backdrop-filter is unavailable */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .card,
+  .table-container,
+  .chart-container,
+  .modal-content,
+  .confirm-dialog,
+  .toast {
+    background: var(--bg-card);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}

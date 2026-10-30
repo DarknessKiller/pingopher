@@ -189,7 +189,8 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ host }) => {
         title={editingNotification ? "Edit Notification" : "Add Notification"}
         zIndex={1100}
       >
-        <form onSubmit={onFinish}>
+        <form className="modal-form" onSubmit={onFinish}>
+          <div className="modal-form-body">
           <div className="form-group">
             <label className="form-label">Name</label>
             <input
@@ -252,7 +253,9 @@ const NotificationManager: React.FC<NotificationManagerProps> = ({ host }) => {
             </>
           )}
 
-          <div className="flex gap-sm" style={{ justifyContent: "flex-end", marginTop: "var(--space-lg)" }}>
+          </div>
+
+          <div className="form-actions">
             <button type="button" className="btn" onClick={() => setIsModalVisible(false)}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={modalLoading}>
               {modalLoading ? "Saving..." : editingNotification ? "Update" : "Create"}
