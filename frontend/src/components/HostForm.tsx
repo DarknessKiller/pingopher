@@ -303,7 +303,7 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
               <p className="form-hint mb-sm">Formats: 200, 200-299, 2xx, 20x, 2*. Press Enter to add.</p>
               <div className="chip-input-wrap" onClick={(e) => (e.currentTarget.querySelector("input") as HTMLInputElement)?.focus()}>
                 {(form.acceptedStatusCodes ?? []).map((code) => (
-                  <span key={code} className="chip">
+                  <span key={code} className={`chip code-${code.trim()[0]}`}>
                     {code}
                     <button type="button" className="chip-remove" onClick={() => removeCode(code)}>×</button>
                   </span>
@@ -321,9 +321,8 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
                   <button
                     key={p.value}
                     type="button"
-                    className="btn btn-ghost btn-sm"
+                    className={`code-btn code-${p.value[0]}`}
                     onClick={() => addCode(p.value)}
-                    style={{ fontSize: "0.75rem" }}
                   >
                     {p.label}
                   </button>
