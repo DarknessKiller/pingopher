@@ -151,7 +151,8 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
   };
 
   return (
-    <form onSubmit={onFinish}>
+    <form className="host-form" onSubmit={onFinish}>
+      <div className="host-form-body">
       <div className="form-grid form-grid-name-protocol mb-md">
         <div className="form-group">
           <label className="form-label">Name</label>
@@ -333,9 +334,13 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
         </details>
       )}
 
-      <button type="submit" className="btn btn-primary w-full" disabled={loading}>
-        {loading ? "Saving..." : initialValues ? "Update Host" : "Create Host"}
-      </button>
+      </div>
+
+      <div className="form-actions">
+        <button type="submit" className="btn btn-primary w-full" disabled={loading}>
+          {loading ? "Saving..." : initialValues ? "Update Host" : "Create Host"}
+        </button>
+      </div>
     </form>
   );
 };

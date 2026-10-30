@@ -702,6 +702,36 @@ a:hover { text-decoration: underline; }
   border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
+/* Form body scrolls; the submit bar is a flex sibling, so it cannot scroll away.
+   Flex sizing, not height: 100% — .modal-body has no definite computed height. */
+.modal-body:has(> .host-form) {
+  display: flex;
+  flex-direction: column;
+}
+.host-form {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+.host-form-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 calc(-1 * var(--space-lg));
+  padding: 0 var(--space-lg) var(--space-md);
+}
+.form-actions {
+  flex-shrink: 0;
+  margin: 0 calc(-1 * var(--space-lg)) calc(-1 * var(--space-lg));
+  padding: var(--space-md) var(--space-lg) var(--space-lg);
+  background: var(--glass-surface);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-top: 1px solid var(--glass-border);
+  box-shadow: 0 -10px 20px -16px rgba(0, 0, 0, 0.25);
+}
+
 
 @keyframes modalFadeIn {
   from { opacity: 0; }
