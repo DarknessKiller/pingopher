@@ -15,15 +15,16 @@ html {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-body {
   background-color: var(--bg-secondary);
   background-image: var(--bg-ambient);
   background-attachment: fixed;
   background-repeat: no-repeat;
+  overscroll-behavior: none;
+  transition: background-color 300ms ease;
+}
+body {
   color: var(--text-primary);
-  transition: background-color 300ms ease, color 300ms ease;
+  transition: color 300ms ease;
   min-height: 100vh;
 }
 
