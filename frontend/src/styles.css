@@ -724,17 +724,17 @@ a:hover { text-decoration: underline; }
 }
 /* Form body scrolls; the submit bar is a flex sibling, so it cannot scroll away.
    Flex sizing, not height: 100% — .modal-body has no definite computed height. */
-.modal-body:has(> .host-form) {
+.modal-body:has(> .modal-form) {
   display: flex;
   flex-direction: column;
 }
-.host-form {
+.modal-form {
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
 }
-.host-form-body {
+.modal-form-body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -742,6 +742,9 @@ a:hover { text-decoration: underline; }
   padding: 0 var(--space-lg) var(--space-md);
 }
 .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
   flex-shrink: 0;
   margin: 0 calc(-1 * var(--space-lg)) calc(-1 * var(--space-lg));
   padding: var(--space-md) var(--space-lg) var(--space-lg);

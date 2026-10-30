@@ -151,8 +151,8 @@ const HostForm: React.FC<HostFormProps> = ({ initialValues, onSuccess }) => {
   };
 
   return (
-    <form className="host-form" onSubmit={onFinish}>
-      <div className="host-form-body">
+    <form className="modal-form" onSubmit={onFinish}>
+      <div className="modal-form-body">
       <div className="form-grid form-grid-name-protocol mb-md">
         <div className="form-group">
           <label className="form-label">Name</label>
