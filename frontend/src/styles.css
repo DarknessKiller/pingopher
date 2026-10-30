@@ -531,6 +531,16 @@ a:hover { text-decoration: underline; }
 .form-input::placeholder {
   color: var(--text-tertiary);
 }
+/* Numbers are typed, not spun: hide the UA steppers */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
 
 .form-grid {
   display: grid;

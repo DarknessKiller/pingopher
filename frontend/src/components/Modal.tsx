@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { CloseIcon } from "./icons";
 
 interface ModalProps {
@@ -40,7 +41,7 @@ const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, width, fo
 
   const overlayStyle = zIndex ? { zIndex } : undefined;
 
-  return (
+  return createPortal(
     <div className={`modal-overlay${closing ? " closing" : ""}`} style={overlayStyle} onClick={handleClose}>
       <div
         className="modal-content"
@@ -56,7 +57,8 @@ const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, width, fo
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-footer">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
