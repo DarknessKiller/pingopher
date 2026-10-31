@@ -25,11 +25,11 @@
     radial-gradient(1000px 620px at 10% -12%, rgba(56, 132, 255, 0.22), transparent 62%),
     radial-gradient(880px 700px at 94% 6%, rgba(120, 158, 210, 0.16), transparent 58%),
     radial-gradient(820px 620px at 66% 104%, rgba(86, 178, 178, 0.10), transparent 60%);
-  --glass-bg: rgba(255, 255, 255, 0.55);
-  --glass-surface: rgba(255, 255, 255, 0.62);
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-surface: rgba(255, 255, 255, 0.82);
   --glass-blur: blur(28px) saturate(180%);
   --glass-border: rgba(255, 255, 255, 0.7);
-  --glass-ring: rgba(0, 0, 0, 0.06);
+  --glass-ring: rgba(0, 0, 0, 0.1);
   --glass-highlight: rgba(255, 255, 255, 0.9);
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1.5 1.75 6 6.25l4.5-4.5' stroke='%236e6e73' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 
@@ -78,8 +78,8 @@
     radial-gradient(1000px 620px at 10% -12%, rgba(10, 132, 255, 0.26), transparent 62%),
     radial-gradient(880px 700px at 94% 6%, rgba(86, 128, 190, 0.2), transparent 58%),
     radial-gradient(820px 620px at 66% 104%, rgba(48, 160, 160, 0.1), transparent 60%);
-  --glass-bg: rgba(28, 28, 30, 0.5);
-  --glass-surface: rgba(38, 38, 42, 0.55);
+  --glass-bg: rgba(28, 28, 30, 0.7);
+  --glass-surface: rgba(38, 38, 42, 0.78);
   --glass-border: rgba(255, 255, 255, 0.12);
   --glass-ring: rgba(0, 0, 0, 0.5);
   --glass-highlight: rgba(255, 255, 255, 0.08);
@@ -111,8 +111,8 @@
       radial-gradient(1000px 620px at 10% -12%, rgba(10, 132, 255, 0.26), transparent 62%),
       radial-gradient(880px 700px at 94% 6%, rgba(86, 128, 190, 0.2), transparent 58%),
       radial-gradient(820px 620px at 66% 104%, rgba(48, 160, 160, 0.1), transparent 60%);
-    --glass-bg: rgba(28, 28, 30, 0.5);
-    --glass-surface: rgba(38, 38, 42, 0.55);
+    --glass-bg: rgba(28, 28, 30, 0.7);
+    --glass-surface: rgba(38, 38, 42, 0.78);
     --glass-border: rgba(255, 255, 255, 0.12);
     --glass-ring: rgba(0, 0, 0, 0.5);
     --glass-highlight: rgba(255, 255, 255, 0.08);
