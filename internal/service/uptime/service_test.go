@@ -173,7 +173,7 @@ func TestService_CreateHost(t *testing.T) {
 		}
 
 		err := svc.CreateHost(context.Background(), &model.Host{Name: "Test Host"})
-		if err != expectedErr {
+		if !errors.Is(err, expectedErr) {
 			t.Errorf("expected error %v, got %v", expectedErr, err)
 		}
 	})
@@ -192,8 +192,14 @@ func TestService_PingHost(t *testing.T) {
 		}))
 		defer ts.Close()
 
-		u, _ := url.Parse(ts.URL)
-		p, _ := strconv.ParseUint(u.Port(), 10, 16)
+		u, err := url.Parse(ts.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		p, err := strconv.ParseUint(u.Port(), 10, 16)
+		if err != nil {
+			t.Fatal(err)
+		}
 		port := uint16(p)
 
 		hostID := ksuid.New()
@@ -241,8 +247,14 @@ func TestService_PingHost(t *testing.T) {
 		}))
 		defer ts.Close()
 
-		u, _ := url.Parse(ts.URL)
-		p, _ := strconv.ParseUint(u.Port(), 10, 16)
+		u, err := url.Parse(ts.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		p, err := strconv.ParseUint(u.Port(), 10, 16)
+		if err != nil {
+			t.Fatal(err)
+		}
 		port := uint16(p)
 
 		hostID := ksuid.New()
@@ -290,8 +302,14 @@ func TestService_PingHost(t *testing.T) {
 		}))
 		defer ts.Close()
 
-		u, _ := url.Parse(ts.URL)
-		p, _ := strconv.ParseUint(u.Port(), 10, 16)
+		u, err := url.Parse(ts.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		p, err := strconv.ParseUint(u.Port(), 10, 16)
+		if err != nil {
+			t.Fatal(err)
+		}
 		port := uint16(p)
 
 		hostID := ksuid.New()
@@ -317,7 +335,7 @@ func TestService_PingHost(t *testing.T) {
 		}
 
 		_, host, histories, err := svc.PingHost(context.Background(), hostID.String())
-		if err != expectedErr {
+		if !errors.Is(err, expectedErr) {
 			t.Errorf("expected error %v, got %v", expectedErr, err)
 		}
 		if host == nil {

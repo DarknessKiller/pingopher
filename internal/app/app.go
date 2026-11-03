@@ -1,6 +1,8 @@
 package app
 
 import (
+	"log"
+
 	"github.com/DarknessKiller/pingopher/internal/bootstrap"
 	"github.com/DarknessKiller/pingopher/internal/config"
 	"github.com/DarknessKiller/pingopher/internal/router"
@@ -28,5 +30,7 @@ func New() *App {
 
 func (a *App) Run() {
 	go a.uptimeScheduler.Start()
-	a.engine.Run(a.config.Host + ":" + a.config.Port)
+	if err := a.engine.Run(a.config.Host + ":" + a.config.Port); err != nil {
+		log.Fatalf("server: %v", err)
+	}
 }

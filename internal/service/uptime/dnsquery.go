@@ -170,7 +170,9 @@ func exchange(ctx context.Context, server, network string, query []byte) ([]byte
 	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
 		deadline = d
 	}
-	_ = conn.SetDeadline(deadline)
+	if err := conn.SetDeadline(deadline); err != nil {
+		return nil, err
+	}
 
 	if network == "tcp" {
 		framed := make([]byte, 2+len(query))

@@ -129,15 +129,3 @@ func (s *Service) resolveICMPTarget(ctx context.Context, host string, dns model.
 
 	return ips[0].IP.String(), nil
 }
-
-// Best-effort "4" or "6" so pro-bing picks the matching socket; empty means the first resolved address.
-func ipFamily(host string) string {
-	host = strings.Trim(host, "[]")
-	if ip := net.ParseIP(host); ip != nil {
-		if ip.To4() != nil {
-			return "4"
-		}
-		return "6"
-	}
-	return ""
-}

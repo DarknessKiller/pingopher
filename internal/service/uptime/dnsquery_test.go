@@ -41,7 +41,7 @@ func TestQueryServerPacketIsWellFormed(t *testing.T) {
 			RecursionAvailable: true,
 		}}
 		if !valid {
-			resp.Header.RCode = dnsmessage.RCodeFormatError
+			resp.RCode = dnsmessage.RCodeFormatError
 		} else {
 			resp.Questions = []dnsmessage.Question{questions[0]}
 			resp.Answers = []dnsmessage.Resource{{
@@ -53,7 +53,9 @@ func TestQueryServerPacketIsWellFormed(t *testing.T) {
 		if err != nil {
 			return
 		}
-		_, _ = conn.WriteTo(packed, addr)
+		if _, err := conn.WriteTo(packed, addr); err != nil {
+			return
+		}
 	}()
 
 	records, _, err := uptime.QueryServer(context.Background(), conn.LocalAddr().String(), "udp", "example.com.", dnsmessage.TypeA)

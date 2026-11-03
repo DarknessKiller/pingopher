@@ -70,7 +70,10 @@ func TestService_PingHost_TCP(t *testing.T) {
 	})
 
 	t.Run("TCP_Failure", func(t *testing.T) {
-		deadLn, _ := net.Listen("tcp", "127.0.0.1:0")
+		deadLn, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
 		deadPort := uint16(deadLn.Addr().(*net.TCPAddr).Port)
 		deadLn.Close() // nothing listening
 
@@ -118,7 +121,9 @@ func TestService_PingHost_UDP(t *testing.T) {
 			if err != nil {
 				return
 			}
-			conn.WriteTo(buf[:n], addr)
+			if _, err := conn.WriteTo(buf[:n], addr); err != nil {
+				return
+			}
 		}
 	}()
 
@@ -230,8 +235,14 @@ func TestService_PingHost_IPv6_HTTP(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	u, _ := url.Parse(ts.URL)
-	p, _ := strconv.ParseUint(u.Port(), 10, 16)
+	u, err := url.Parse(ts.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := strconv.ParseUint(u.Port(), 10, 16)
+	if err != nil {
+		t.Fatal(err)
+	}
 	port := uint16(p)
 
 	hostID := ksuid.New()
