@@ -23,11 +23,11 @@ func (r CreateHostRequest) Validate() error {
 		if len(r.AcceptedStatusCodes) == 0 {
 			return ValidationError{MissingFields: []string{"AcceptedStatusCodes"}}
 		}
-		if r.Port != nil && (*r.Port < 1 || *r.Port > 65535) {
+		if r.Port != nil && *r.Port < 1 {
 			return ValidationError{MissingFields: []string{"Port"}}
 		}
 	case "tcp", "udp":
-		if r.Port == nil || *r.Port < 1 || *r.Port > 65535 {
+		if r.Port == nil || *r.Port < 1 {
 			return ValidationError{MissingFields: []string{"Port"}}
 		}
 	}
@@ -140,7 +140,7 @@ type UpdateHostRequest struct {
 }
 
 func (r UpdateHostRequest) Validate() error {
-	if r.Port != nil && (*r.Port < 1 || *r.Port > 65535) {
+	if r.Port != nil && *r.Port < 1 {
 		return ValidationError{MissingFields: []string{"Port"}}
 	}
 	switch r.Protocol {

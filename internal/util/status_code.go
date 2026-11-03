@@ -103,8 +103,14 @@ func expandWildcardPattern(s string) (uint16, uint16, error) {
 	fromStr := fromBuilder.String()
 	toStr := toBuilder.String()
 
-	from, _ := strconv.ParseUint(fromStr, 10, 16)
-	to, _ := strconv.ParseUint(toStr, 10, 16)
+	from, err := strconv.ParseUint(fromStr, 10, 16)
+	if err != nil {
+		return 0, 0, fmt.Errorf("status code out of range: %s: %w", fromStr, err)
+	}
+	to, err := strconv.ParseUint(toStr, 10, 16)
+	if err != nil {
+		return 0, 0, fmt.Errorf("status code out of range: %s: %w", toStr, err)
+	}
 
 	return uint16(from), uint16(to), nil
 }

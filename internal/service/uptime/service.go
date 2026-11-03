@@ -55,7 +55,7 @@ func NewService(config *config.Config, hostRepository repository.HostRepository,
 func (s *Service) CreateHost(ctx context.Context, host *model.Host) error {
 	err := s.repository.Host().Create(ctx, host)
 	if err == nil {
-		s.cache.Delete(ctx, "pingopher_hosts:all")
+		cache.Forget(ctx, s.cache, "pingopher_hosts:all")
 	}
 	return err
 }
@@ -72,7 +72,7 @@ func (s *Service) GetHostByID(ctx context.Context, hostID string) (*model.Host, 
 		return nil, err
 	}
 
-	_ = s.cache.Set(ctx, cacheKey, host, 24*time.Hour)
+	cache.Remember(ctx, s.cache, cacheKey, host, 24*time.Hour)
 	return host, err
 }
 
@@ -85,7 +85,7 @@ func (s *Service) GetAllHosts(ctx context.Context) ([]model.Host, error) {
 
 	hosts, err := s.repository.Host().GetAll(ctx)
 	if err == nil {
-		_ = s.cache.Set(ctx, cacheKey, hosts, 24*time.Hour)
+		cache.Remember(ctx, s.cache, cacheKey, hosts, 24*time.Hour)
 	}
 	return hosts, err
 }
@@ -101,7 +101,7 @@ func (s *Service) UpdateHost(ctx context.Context, hostID string, host *model.Hos
 		return nil, err
 	}
 
-	_ = s.cache.Delete(ctx, "pingopher_hosts:all", "pingopher_host:"+hostID)
+	cache.Forget(ctx, s.cache, "pingopher_hosts:all", "pingopher_host:"+hostID)
 	return host, nil
 }
 
@@ -113,7 +113,7 @@ func (s *Service) DeleteHost(ctx context.Context, hostID string) error {
 
 	err = s.repository.Host().Delete(ctx, hostID)
 	if err == nil {
-		_ = s.cache.Delete(ctx, "pingopher_hosts:all", "pingopher_host:"+hostID)
+		cache.Forget(ctx, s.cache, "pingopher_hosts:all", "pingopher_host:"+hostID)
 	}
 	return err
 }
@@ -149,7 +149,7 @@ func (s *Service) PingHost(ctx context.Context, hostID string) (prevStatus model
 			return "", nil, nil, err
 		}
 
-		_ = s.cache.Set(ctx, cacheKey, host, 24*time.Hour)
+		cache.Remember(ctx, s.cache, cacheKey, host, 24*time.Hour)
 	}
 
 	var (
@@ -227,8 +227,8 @@ func (s *Service) PingHost(ctx context.Context, hostID string) (prevStatus model
 	defer cancelWrite()
 
 	if prevStatus != host.Status {
-		_ = s.cache.Set(writeCtx, cacheKey, host, 24*time.Hour)
-		_ = s.cache.Delete(writeCtx, "pingopher_hosts:all")
+		cache.Remember(writeCtx, s.cache, cacheKey, host, 24*time.Hour)
+		cache.Forget(writeCtx, s.cache, "pingopher_hosts:all")
 	}
 
 	if histories, err = s.repository.History().CreatePingHistory(writeCtx, prevStatus, host, histories); err != nil {
@@ -282,15 +282,12 @@ func (s *Service) pingHTTP(ctx context.Context, host *model.Host, dns model.DNS)
 	if host.Port != nil && *host.Port != 0 {
 		hostURL = strings.ToLower(host.Protocol) + "://" + net.JoinHostPort(host.HostURL, strconv.Itoa(int(*host.Port)))
 	}
-	var errorMsg string
 	resp, err := client.R().WithContext(ctx).Get(hostURL)
-	switch err.(type) {
-	case nil:
-		if resp != nil && resp.CascadeError != nil {
-			errorMsg = resp.CascadeError.Error()
-		}
-	default:
+	var errorMsg string
+	if err != nil {
 		errorMsg = err.Error()
+	} else if resp != nil && resp.CascadeError != nil {
+		errorMsg = resp.CascadeError.Error()
 	}
 
 	statusCode := 0
@@ -334,8 +331,6 @@ func (s *Service) httpClient(dns model.DNS, insecure bool) *resty.Client {
 	s.httpClients[key] = client
 	return client
 }
-
-
 
 func (s *Service) pingTCP(ctx context.Context, host *model.Host, dns model.DNS) (*model.History, error) {
 	if err := beforeProbe(ctx); err != nil {
@@ -404,14 +399,24 @@ func (s *Service) pingUDP(ctx context.Context, host *model.Host, dns model.DNS) 
 	}
 
 	if deadline, ok := ctx.Deadline(); ok {
-		conn.SetReadDeadline(deadline)
+		err = conn.SetReadDeadline(deadline)
 	} else {
-		conn.SetReadDeadline(time.Now().Add(pingTimeout))
+		err = conn.SetReadDeadline(time.Now().Add(pingTimeout))
+	}
+	if err != nil {
+		return &model.History{
+			StatusCode:   0,
+			Latency:      latencyMilliseconds(time.Since(start)),
+			HostID:       host.ID,
+			DNS:          dns,
+			ErrorMessage: err.Error(),
+		}, nil
 	}
 
 	buf := make([]byte, 1500)
 	if _, err := conn.Read(buf); err != nil {
-		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+		var netErr net.Error
+		if errors.As(err, &netErr) && netErr.Timeout() {
 			err = errors.New("UDP read timeout: no response received")
 		}
 		return &model.History{

@@ -185,7 +185,7 @@ func (ps *Scheduler) runPingForHost(ctx context.Context, hostID string) {
 				ps.notificationService.SendSystemErrorNotification(host, "Database Error", err.Error())
 			}
 		}
-		if !(os.IsTimeout(err) || errors.Is(err, gorm.ErrRecordNotFound)) {
+		if !os.IsTimeout(err) && !errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Printf("[%s] ping failed: %v", hostID, err)
 		}
 		return

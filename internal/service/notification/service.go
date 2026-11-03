@@ -41,13 +41,13 @@ func (ns *NotificationService) CreateNotification(ctx context.Context, hostId st
 			return err
 		}
 
-		_ = ns.cache.Set(ctx, cacheKey, host, 24*time.Hour)
+		cache.Remember(ctx, ns.cache, cacheKey, host, 24*time.Hour)
 	}
 
 	notification.HostID = host.ID
 	err := ns.repository.Notification().Create(ctx, notification)
 	if err == nil {
-		_ = ns.cache.Delete(ctx, "pingopher_notifications:"+hostId, "pingopher_active_notifications:"+hostId)
+		cache.Forget(ctx, ns.cache, "pingopher_notifications:"+hostId, "pingopher_active_notifications:"+hostId)
 	}
 	return err
 }
@@ -64,7 +64,7 @@ func (ns *NotificationService) GetNotificationsForHost(ctx context.Context, host
 		return nil, err
 	}
 
-	_ = ns.cache.Set(ctx, cacheKey, notifications, 24*time.Hour)
+	cache.Remember(ctx, ns.cache, cacheKey, notifications, 24*time.Hour)
 	return notifications, nil
 }
 
@@ -80,7 +80,7 @@ func (ns *NotificationService) DeleteNotification(ctx context.Context, hostId, n
 
 	err = ns.repository.Notification().Delete(ctx, notificationId)
 	if err == nil {
-		_ = ns.cache.Delete(ctx, "pingopher_notifications:"+hostId, "notification:"+notificationId)
+		cache.Forget(ctx, ns.cache, "pingopher_notifications:"+hostId, "notification:"+notificationId)
 	}
 	return err
 }
@@ -97,7 +97,7 @@ func (ns *NotificationService) UpdateNotification(ctx context.Context, hostId, n
 
 	err = ns.repository.Notification().Update(ctx, notificationId, notification)
 	if err == nil {
-		_ = ns.cache.Delete(ctx, "pingopher_notifications:"+hostId, "pingopher_active_notifications:"+hostId)
+		cache.Forget(ctx, ns.cache, "pingopher_notifications:"+hostId, "pingopher_active_notifications:"+hostId)
 	}
 	return err
 }
@@ -132,7 +132,7 @@ func (ns *NotificationService) SendNotification(host *model.Host, histories []*m
 			return
 		}
 
-		_ = ns.cache.Set(ctx, cacheKey, notifications, 24*time.Hour)
+		cache.Remember(ctx, ns.cache, cacheKey, notifications, 24*time.Hour)
 	}
 
 	for _, n := range notifications {
@@ -149,7 +149,7 @@ func (ns *NotificationService) SendNotification(host *model.Host, histories []*m
 func (ns *NotificationService) DeleteNotifications(ctx context.Context, hostId string) error {
 	err := ns.repository.Notification().DeleteNotifications(ctx, hostId)
 	if err == nil {
-		_ = ns.cache.Delete(ctx, "pingopher_notifications:"+hostId, "pingopher_active_notifications:"+hostId)
+		cache.Forget(ctx, ns.cache, "pingopher_notifications:"+hostId, "pingopher_active_notifications:"+hostId)
 	}
 	return err
 }
@@ -184,7 +184,7 @@ func (ns *NotificationService) SendSystemErrorNotification(host *model.Host, tit
 			return
 		}
 
-		_ = ns.cache.Set(ctx, cacheKey, notifications, 24*time.Hour)
+		cache.Remember(ctx, ns.cache, cacheKey, notifications, 24*time.Hour)
 	}
 
 	for _, n := range notifications {
