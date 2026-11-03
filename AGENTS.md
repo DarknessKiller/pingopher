@@ -16,5 +16,6 @@ If there is no `.codegraph/` directory, run `codegraph init` at the repo root. O
 3. Locate code with CodeGraph, and run `codegraph sync` after a structural change.
 4. Run the verify block in `CODING_STANDARDS.md` for the changed files: `go test ./...` and `go tool golangci-lint run` for Go, `npx tsc -b` and `npx eslint .` for the frontend.
 5. Check each changed line against its section; where the code is right and the rule is wrong, fix the doc in the same change.
+6. Before handoff, commit, push, or PR, run `.agents/skills/change-verification/SKILL.md`: two review subagents, then the gates on the final tree.
 
 Rules always true live in this file. Rules consulted while writing code live in `CODING_STANDARDS.md`.
