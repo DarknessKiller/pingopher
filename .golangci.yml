@@ -1,0 +1,27 @@
+version: "2"
+
+run:
+  tests: true # test files are code: lint and format them too
+
+linters:
+  default: standard
+  enable:
+    - errorlint
+  settings:
+    errcheck:
+      check-blank: true # `_ = err` in a test setup line is a dropped error
+      # A Close on a socket or response body is already-torn-down state; there is nothing to do with it.
+      exclude-functions:
+        - (io.Closer).Close
+        - (net.Conn).Close
+        - (*net.UDPConn).Close
+        - (net.Listener).Close
+        - (net.PacketConn).Close
+  exclusions:
+    paths:
+      - frontend/node_modules # ships a vendored .go file that is not ours
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
