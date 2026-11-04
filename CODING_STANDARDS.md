@@ -92,7 +92,7 @@ Every request and response crosses the boundary as a DTO; `model` types never ap
 **Files:** repo-wide
 
 - A comment earns its line only as a constraint, a workaround, or a trap the code cannot show: `// PingHost applies its own deadline, so only detach from the request.` Uncommented code is the default.
-- One line, above the line it explains. An exported doc comment is one sentence.
+- One or two lines, above the line it explains. An exported doc comment is one sentence.
 - Tool-owned comments stay: the Vite template URL in `frontend/vite.config.ts`, `eslint-disable` directives, `//go:` pragmas.
 
 ## Verify

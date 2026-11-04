@@ -46,7 +46,7 @@ func NewService(config *config.Config, hostRepository repository.HostRepository,
 		config:      config,
 		repository:  &newRepository{HostRepo: hostRepository, HistoryRepo: historyRepository},
 		cache:       cacheClient,
-		dnsCache:    newDNSCache(),
+		dnsCache:    newDNSCache(config.DNSOptimisticCache),
 		httpClients: make(map[httpClientKey]*resty.Client),
 	}
 

@@ -2,7 +2,9 @@ package uptime_test
 
 import (
 	"context"
+	"errors"
 	"net"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -14,11 +16,11 @@ import (
 )
 
 func TestDNSCacheReusesAnswerWithinTTL(t *testing.T) {
-	cache := uptime.NewDNSCache()
+	cache := uptime.NewDNSCache(false)
 
-	var calls int32
+	var calls atomic.Int32
 	resolve := func(ctx context.Context, host string) ([]uptime.DNSRecord, error) {
-		atomic.AddInt32(&calls, 1)
+		calls.Add(1)
 		return []uptime.DNSRecord{{IP: net.ParseIP("192.0.2.1"), TTL: time.Hour}}, nil
 	}
 
@@ -28,7 +30,7 @@ func TestDNSCacheReusesAnswerWithinTTL(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got := atomic.LoadInt32(&calls); got != 1 {
+	if got := calls.Load(); got != 1 {
 		t.Fatalf("expected 1 resolver call within TTL, got %d", got)
 	}
 
@@ -36,17 +38,17 @@ func TestDNSCacheReusesAnswerWithinTTL(t *testing.T) {
 	if _, err := uptime.Lookup(cache, context.Background(), model.DNS{IP: "1.1.1.1"}, "example.com", resolve); err != nil {
 		t.Fatal(err)
 	}
-	if got := atomic.LoadInt32(&calls); got != 2 {
+	if got := calls.Load(); got != 2 {
 		t.Fatalf("expected per-resolver cache keys, got %d calls", got)
 	}
 }
 
 func TestDNSCacheExpiresAtServerTTL(t *testing.T) {
-	cache := uptime.NewDNSCache()
+	cache := uptime.NewDNSCache(false)
 
-	var calls int32
+	var calls atomic.Int32
 	resolve := func(ctx context.Context, host string) ([]uptime.DNSRecord, error) {
-		atomic.AddInt32(&calls, 1)
+		calls.Add(1)
 		return []uptime.DNSRecord{{IP: net.ParseIP("192.0.2.1"), TTL: 20 * time.Millisecond}}, nil
 	}
 
@@ -57,17 +59,17 @@ func TestDNSCacheExpiresAtServerTTL(t *testing.T) {
 	if _, err := uptime.Lookup(cache, context.Background(), model.DNS{}, "example.com", resolve); err != nil {
 		t.Fatal(err)
 	}
-	if got := atomic.LoadInt32(&calls); got != 2 {
+	if got := calls.Load(); got != 2 {
 		t.Fatalf("expected a re-query after the server TTL elapsed, got %d", got)
 	}
 }
 
 func TestDNSCacheDoesNotCacheZeroTTL(t *testing.T) {
-	cache := uptime.NewDNSCache()
+	cache := uptime.NewDNSCache(false)
 
-	var calls int32
+	var calls atomic.Int32
 	resolve := func(ctx context.Context, host string) ([]uptime.DNSRecord, error) {
-		atomic.AddInt32(&calls, 1)
+		calls.Add(1)
 		return []uptime.DNSRecord{{IP: net.ParseIP("192.0.2.1"), TTL: 0}}, nil
 	}
 
@@ -76,17 +78,17 @@ func TestDNSCacheDoesNotCacheZeroTTL(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if got := atomic.LoadInt32(&calls); got != 2 {
+	if got := calls.Load(); got != 2 {
 		t.Fatalf("expected TTL 0 to bypass the cache, got %d calls", got)
 	}
 }
 
 func TestDNSCacheDoesNotCacheErrors(t *testing.T) {
-	cache := uptime.NewDNSCache()
+	cache := uptime.NewDNSCache(false)
 
-	var calls int32
+	var calls atomic.Int32
 	failing := func(ctx context.Context, host string) ([]uptime.DNSRecord, error) {
-		atomic.AddInt32(&calls, 1)
+		calls.Add(1)
 		return nil, context.DeadlineExceeded
 	}
 
@@ -95,7 +97,7 @@ func TestDNSCacheDoesNotCacheErrors(t *testing.T) {
 			t.Fatal("expected lookup error")
 		}
 	}
-	if got := atomic.LoadInt32(&calls); got != 2 {
+	if got := calls.Load(); got != 2 {
 		t.Fatalf("expected errors to bypass the cache, got %d calls", got)
 	}
 }
@@ -160,5 +162,111 @@ func TestParseResponseFollowsCNAME(t *testing.T) {
 	}
 	if len(records) != 0 {
 		t.Fatalf("expected no addresses alongside a CNAME, got %+v", records)
+	}
+}
+
+func TestDNSCacheOptimisticServesStaleWhileRefreshing(t *testing.T) {
+	cache := uptime.NewDNSCache(true)
+
+	var calls atomic.Int32
+	resolve := func(ctx context.Context, host string) ([]uptime.DNSRecord, error) {
+		if calls.Add(1) == 1 {
+			return []uptime.DNSRecord{{IP: net.ParseIP("192.0.2.1"), TTL: 20 * time.Millisecond}}, nil
+		}
+		return []uptime.DNSRecord{{IP: net.ParseIP("192.0.2.2"), TTL: time.Hour}}, nil
+	}
+
+	if _, err := uptime.Lookup(cache, t.Context(), model.DNS{}, "example.com", resolve); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(40 * time.Millisecond)
+
+	// Past the TTL the stale answer returns at once instead of blocking on the re-query.
+	ips, err := uptime.Lookup(cache, t.Context(), model.DNS{}, "example.com", resolve)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ips) != 1 || !ips[0].IP.Equal(net.ParseIP("192.0.2.1")) {
+		t.Fatalf("expected stale 192.0.2.1, got %+v", ips)
+	}
+
+	deadline := time.Now().Add(time.Second)
+	for {
+		ips, err = uptime.Lookup(cache, t.Context(), model.DNS{}, "example.com", resolve)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(ips) == 1 && ips[0].IP.Equal(net.ParseIP("192.0.2.2")) {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("expected refreshed 192.0.2.2, got %+v", ips)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+func TestDNSCacheOptimisticRefreshesOnce(t *testing.T) {
+	cache := uptime.NewDNSCache(true)
+
+	var calls atomic.Int32
+	resolve := func(ctx context.Context, host string) ([]uptime.DNSRecord, error) {
+		if calls.Add(1) == 1 {
+			return []uptime.DNSRecord{{IP: net.ParseIP("192.0.2.1"), TTL: 20 * time.Millisecond}}, nil
+		}
+		time.Sleep(50 * time.Millisecond)
+		return []uptime.DNSRecord{{IP: net.ParseIP("192.0.2.2"), TTL: time.Hour}}, nil
+	}
+
+	if _, err := uptime.Lookup(cache, t.Context(), model.DNS{}, "example.com", resolve); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(40 * time.Millisecond)
+
+	var wg sync.WaitGroup
+	for range 50 {
+		wg.Go(func() {
+			ips, err := uptime.Lookup(cache, t.Context(), model.DNS{}, "example.com", resolve)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			if len(ips) != 1 || !ips[0].IP.Equal(net.ParseIP("192.0.2.1")) {
+				t.Errorf("expected stale 192.0.2.1, got %+v", ips)
+			}
+		})
+	}
+	wg.Wait()
+
+	if got := calls.Load(); got != 2 {
+		t.Fatalf("expected the first answer plus one refresh, got %d resolver calls", got)
+	}
+}
+
+func TestDNSCacheOptimisticKeepsStaleWhenRefreshFails(t *testing.T) {
+	cache := uptime.NewDNSCache(true)
+
+	var calls atomic.Int32
+	resolve := func(ctx context.Context, host string) ([]uptime.DNSRecord, error) {
+		if calls.Add(1) == 1 {
+			return []uptime.DNSRecord{{IP: net.ParseIP("192.0.2.1"), TTL: 20 * time.Millisecond}}, nil
+		}
+		return nil, errors.New("resolver down")
+	}
+
+	if _, err := uptime.Lookup(cache, t.Context(), model.DNS{}, "example.com", resolve); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(40 * time.Millisecond)
+
+	// The failing refresh must not surface its error while the stale answer is still fresh enough.
+	for i := range 2 {
+		ips, err := uptime.Lookup(cache, t.Context(), model.DNS{}, "example.com", resolve)
+		if err != nil {
+			t.Fatalf("lookup %d: unexpected error %v", i, err)
+		}
+		if len(ips) != 1 || !ips[0].IP.Equal(net.ParseIP("192.0.2.1")) {
+			t.Fatalf("lookup %d: expected stale 192.0.2.1, got %+v", i, ips)
+		}
 	}
 }

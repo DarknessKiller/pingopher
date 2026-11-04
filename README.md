@@ -100,6 +100,7 @@ Configure via environment variables in `.env`:
 | `PINGOPHER_REDIS_PASSWORD`      |                      | Redis password                           |
 | `PINGOPHER_MAX_RETRY_INTERVAL`  | `900`                | Max backoff interval (seconds) when down  |
 | `PINGOPHER_NOTIFICATION_COOLDOWN` | `900`                | Min seconds between alerts per host and direction |
+| `PINGOPHER_DNS_OPTIMISTIC_CACHE` | `false`              | Serve expired DNS answers while refreshing in the background |
 
 Cloudflare D1 requires additional `PINGOPHER_CF_D1_*` variables (account ID, auth token, database string).
 
