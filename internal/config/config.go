@@ -33,6 +33,10 @@ type Config struct {
 
 	// Notifications
 	NotificationCooldown int
+
+	// DNS
+	// Optimistic caching serves an expired answer while it refreshes in the background.
+	DNSOptimisticCache bool
 }
 
 func Load() (*Config, error) {
@@ -62,6 +66,15 @@ func Load() (*Config, error) {
 		}
 	}
 
+	dnsOptimisticCache := false
+	if optimisticEnv := os.Getenv("PINGOPHER_DNS_OPTIMISTIC_CACHE"); optimisticEnv != "" {
+		var err error
+		dnsOptimisticCache, err = strconv.ParseBool(optimisticEnv)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	cfg := &Config{
 		Env:           os.Getenv("ENV"),
 		Host:          os.Getenv("PINGOPHER_HOST"),
@@ -78,6 +91,7 @@ func Load() (*Config, error) {
 		},
 		MaxRetryInterval:     maxRetryInterval,
 		NotificationCooldown: notificationCooldown,
+		DNSOptimisticCache:   dnsOptimisticCache,
 	}
 
 	return cfg, nil
